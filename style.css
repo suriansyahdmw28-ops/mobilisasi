@@ -997,208 +997,29 @@ select.form-control {
     font-size: var(--font-size-lg);
 }
 
-.benefits-section,
-.phases-section,
-.indication-section,
-.safety-section {
-    margin-bottom: var(--space-32);
+/* ============================== */
+/* === Style untuk PDF Viewer === */
+/* ============================== */
+
+/* Mengatur ulang padding dari container utama leaflet */
+.leaflet-content {
+    padding: 0; /* Hapus padding agar PDF menempel ke tepi */
+    background: transparent; /* Hapus background default */
+    border: none; /* Hapus border default */
+    box-shadow: none; /* Hapus shadow default */
 }
 
-.benefits-section h3,
-.phases-section h3,
-.safety-section h4 {
-    color: var(--color-text);
-    margin-bottom: var(--space-20);
-    display: flex;
-    align-items: center;
-    gap: var(--space-8);
-}
-
-.benefit-list {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-    gap: var(--space-12);
-}
-
-.benefit-item {
-    display: flex;
-    align-items: center;
-    gap: var(--space-12);
-    padding: var(--space-12);
-    background: var(--color-bg-3);
-    border-radius: var(--radius-base);
-    border-left: 4px solid var(--color-success);
-}
-
-.benefit-item i {
-    color: var(--color-success);
-    font-size: var(--font-size-lg);
-    flex-shrink: 0;
-}
-
-.benefit-item span {
-    color: var(--color-text);
-    font-weight: var(--font-weight-medium);
-}
-
-.phase-card {
-    background: var(--color-bg-1);
-    border: 1px solid var(--color-card-border);
+.pdf-viewer-container {
+    width: 100%;
+    height: 800px; /* Pastikan tinggi ini sama dengan di HTML */
+    border: 1px solid var(--color-border);
     border-radius: var(--radius-lg);
-    margin-bottom: var(--space-16);
-    overflow: hidden;
+    overflow: hidden; /* Agar sudutnya rapi */
 }
 
-.phase-header {
-    padding: var(--space-16);
-    text-align: center;
-    font-weight: var(--font-weight-bold);
-}
-
-.phase-1 { background: var(--color-bg-1); }
-.phase-2 { background: var(--color-bg-3); }
-.phase-3 { background: var(--color-bg-6); }
-.phase-4 { background: var(--color-bg-8); }
-.phase-5 { background: var(--color-bg-5); }
-
-.phase-header h4 {
-    margin: 0;
-    font-size: var(--font-size-lg);
-    color: var(--color-text);
-}
-
-.phase-content {
-    padding: var(--space-20);
-    background: var(--color-surface);
-}
-
-.phase-content ul {
-    list-style: none;
-    padding: 0;
-    margin: 0 0 var(--space-16) 0;
-}
-
-.phase-content li {
-    padding: var(--space-6) 0;
-    color: var(--color-text);
-    display: flex;
-    align-items: flex-start;
-    gap: var(--space-8);
-}
-
-.phase-content li::before {
-    content: "✓";
-    color: var(--color-success);
-    font-weight: var(--font-weight-bold);
-    flex-shrink: 0;
-}
-
-.phase-content p {
-    margin: 0;
-    color: var(--color-text-secondary);
-    font-size: var(--font-size-sm);
-}
-
-.indication-section {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-    gap: var(--space-20);
-}
-
-.indication-box {
-    padding: var(--space-20);
-    border-radius: var(--radius-base);
-    border: 2px solid;
-}
-
-.indication-green {
-    background: rgba(var(--color-success-rgb), 0.1);
-    border-color: var(--color-success);
-}
-
-.indication-red {
-    background: rgba(var(--color-error-rgb), 0.1);
-    border-color: var(--color-error);
-}
-
-.indication-box h4 {
-    margin: 0 0 var(--space-12) 0;
-    display: flex;
-    align-items: center;
-    gap: var(--space-8);
-    font-size: var(--font-size-lg);
-}
-
-.indication-green h4 {
-    color: var(--color-success);
-}
-
-.indication-red h4 {
-    color: var(--color-error);
-}
-
-.indication-box ul {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-}
-
-.indication-box li {
-    padding: var(--space-4) 0;
-    color: var(--color-text);
-    display: flex;
-    align-items: flex-start;
-    gap: var(--space-8);
-}
-
-.indication-green li::before {
-    content: "✓";
-    color: var(--color-success);
-    font-weight: var(--font-weight-bold);
-}
-
-.indication-red li::before {
-    content: "✗";
-    color: var(--color-error);
-    font-weight: var(--font-weight-bold);
-}
-
-.safety-tips {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: var(--space-12);
-}
-
-.tip-item {
-    display: flex;
-    align-items: center;
-    gap: var(--space-8);
-    padding: var(--space-12);
-    background: var(--color-bg-4);
-    border-radius: var(--radius-base);
-}
-
-.tip-item i {
-    color: var(--color-warning);
-    font-size: var(--font-size-lg);
-}
-
-.tip-item span {
-    color: var(--color-text);
-    font-weight: var(--font-weight-medium);
-    font-size: var(--font-size-sm);
-}
-
-.leaflet-footer {
-    text-align: center;
-    margin-top: var(--space-32);
-    padding-top: var(--space-24);
-    border-top: 1px solid var(--color-border);
-}
-
-.leaflet-footer p {
-    margin: var(--space-4) 0;
-    color: var(--color-text-secondary);
+.pdf-viewer-container embed {
+    width: 100%;
+    height: 100%;
 }
 
 /* Video Page Styles */

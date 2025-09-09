@@ -6,7 +6,6 @@
     <title>Program MLQ - RSUD Pangeran Jaya Sumitra Kotabaru</title>
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
 <body>
     <!-- Header -->
@@ -18,12 +17,9 @@
                     <div class="header-text">
                         <h1>RSUD Pangeran Jaya Sumitra Kotabaru</h1>
                         <p>Program MLQ - Mobilisasi Dini Post Operasi</p>
-                        <small>Ruang Kerapu - Suriansyah, S.Kep., Ns</small>
+                        <small>Ruang Kerapu</small>
                     </div>
                 </div>
-                <button class="btn btn--outline btn--sm" onclick="window.print()">
-                    <i class="fas fa-print"></i> Cetak
-                </button>
             </div>
         </div>
     </header>
@@ -66,57 +62,35 @@
                         <h2>Program MLQ</h2>
                         <h3>Early Mobilization, Leaflet & Video QR Code</h3>
                         <p>Sistem informasi terintegrasi untuk edukasi dan monitoring mobilisasi dini pasien post operasi di Ruang Kerapu</p>
-                        <div class="hero-stats">
-                            <div class="stat-item">
-                                <div class="stat-number">65%</div>
-                                <div class="stat-label">Mencegah DVT</div>
-                            </div>
-                            <div class="stat-item">
-                                <div class="stat-number">40%</div>
-                                <div class="stat-label">Kurangi Pneumonia</div>
-                            </div>
-                            <div class="stat-item">
-                                <div class="stat-number">2-3 Hari</div>
-                                <div class="stat-label">Percepat Pulih</div>
-                            </div>
-                        </div>
                     </div>
                 </div>
                 
                 <div class="menu-grid">
                     <div class="menu-card" data-page="leaflet">
-                        <div class="menu-icon">
-                            <i class="fas fa-book-open"></i>
-                        </div>
+                        <div class="menu-icon"><i class="fas fa-book-open"></i></div>
                         <h4>Leaflet Digital</h4>
-                        <p>Panduan lengkap protokol mobilisasi dini post operasi sesuai fase 0-24+ jam</p>
+                        <p>Panduan lengkap protokol mobilisasi dini pasca operasi.</p>
                         <button class="btn btn--primary btn--sm">Buka Leaflet</button>
                     </div>
                     
                     <div class="menu-card" data-page="video">
-                        <div class="menu-icon">
-                            <i class="fas fa-play-circle"></i>
-                        </div>
+                        <div class="menu-icon"><i class="fas fa-play-circle"></i></div>
                         <h4>Video Edukasi</h4>
-                        <p>Demonstrasi visual teknik mobilisasi yang benar dengan QR Code akses</p>
+                        <p>Demonstrasi visual teknik mobilisasi dengan akses QR Code.</p>
                         <button class="btn btn--primary btn--sm">Tonton Video</button>
                     </div>
                     
                     <div class="menu-card" data-page="questionnaire">
-                        <div class="menu-icon">
-                            <i class="fas fa-clipboard-question"></i>
-                        </div>
-                        <h4>Kuesioner (6 Soal)</h4>
-                        <p>Pre-test dan post-test pengetahuan mobilisasi dini (skor maksimal 12)</p>
+                        <div class="menu-icon"><i class="fas fa-clipboard-question"></i></div>
+                        <h4>Kuesioner Pengetahuan</h4>
+                        <p>Lakukan Pre-test dan Post-test untuk mengukur pemahaman.</p>
                         <button class="btn btn--primary btn--sm">Mulai Kuesioner</button>
                     </div>
                     
                     <div class="menu-card" data-page="observation">
-                        <div class="menu-icon">
-                            <i class="fas fa-chart-line"></i>
-                        </div>
+                        <div class="menu-icon"><i class="fas fa-chart-line"></i></div>
                         <h4>Lembar Observasi</h4>
-                        <p>Skala Mobilitas Pasca-Operasi (SMP-O) Level 0-6 dengan target harian</p>
+                        <p>Catat perkembangan mobilisasi pasien dengan Skala SMP-O.</p>
                         <button class="btn btn--primary btn--sm">Buka Form</button>
                     </div>
                 </div>
@@ -125,53 +99,29 @@
             <!-- Leaflet Page -->
             <div id="leaflet-page" class="page">
                 <div class="page-header">
-                    <h2>Leaflet Digital - Mobilisasi Dini Post Operasi</h2>
-                    <button class="btn btn--primary btn--sm export-leaflet-btn">
-                        <i class="fas fa-download"></i> Download PDF Leaflet
-                    </button>
+                    <h2>Leaflet Digital - Mobilisasi Dini</h2>
+                    <!-- Tombol download sekarang menjadi link biasa untuk men-trigger download -->
+                    <a href="leaflet.pdf" download="Leaflet-Mobilisasi-Dini.pdf" class="btn btn--primary btn--sm">
+                        <i class="fas fa-download"></i> Download PDF
+                    </a>
                 </div>
                 <div class="leaflet-content">
                     <div class="pdf-viewer-container">
-                        <!-- PERUBAHAN: Mengganti <embed> dengan <iframe> agar lebih kompatibel -->
-                        <iframe src="https://raw.githubusercontent.com/suriansyahdmw28-ops/mobilisasi/refs/heads/main/leaflet.pdf"></iframe>
+                        <!-- Path diperbaiki untuk memuat file dari folder yang sama -->
+                        <iframe src="leaflet.pdf"></iframe>
                     </div>
                 </div>
             </div>
 
             <!-- Video Page -->
             <div id="video-page" class="page">
-                <div class="page-header">
-                    <h2>Video Edukasi Mobilisasi Dini</h2>
-                </div>
-                
+                <div class="page-header"><h2>Video Edukasi Mobilisasi Dini</h2></div>
                 <div class="video-content">
                     <div class="video-container">
                         <div class="video-placeholder">
                             <i class="fas fa-play-circle"></i>
                             <h3>Video akan segera tersedia</h3>
-                            <p>Upload video demonstrasi mobilisasi dini ke YouTube atau platform lain, lalu update link di sini</p>
-                        </div>
-                    </div>
-                    
-                    <div class="qr-section">
-                        <h3>Akses Cepat via QR Code</h3>
-                        <div class="qr-container">
-                            <div class="qr-code">
-                                <i class="fas fa-qrcode"></i>
-                                <p>QR Code untuk akses mobile</p>
-                                <button class="btn btn--secondary btn--sm generate-qr-btn">
-                                    <i class="fas fa-qrcode"></i> Generate QR
-                                </button>
-                            </div>
-                            <div class="qr-info">
-                                <h4>Cara Menggunakan:</h4>
-                                <ol>
-                                    <li>Buka kamera smartphone</li>
-                                    <li>Arahkan ke QR code</li>
-                                    <li>Tap notifikasi yang muncul</li>
-                                    <li>Akses langsung ke video</li>
-                                </ol>
-                            </div>
+                            <p>Video demonstrasi dapat di-embed di sini.</p>
                         </div>
                     </div>
                 </div>
@@ -179,58 +129,38 @@
 
             <!-- Questionnaire Page -->
             <div id="questionnaire-page" class="page">
-                <div class="page-header">
-                    <h2>Kuesioner Pengetahuan Mobilisasi Dini (6 Soal)</h2>
-                    <div class="score-info">
-                        <span class="score-badge">Skor Maksimal: 12 Poin</span>
-                    </div>
-                </div>
-                
+                <div class="page-header"><h2>Kuesioner Pengetahuan (6 Soal)</h2></div>
                 <div class="questionnaire-content">
                     <div class="test-selector">
                         <button class="btn btn--primary test-btn active" data-test="pretest">Pre-Test</button>
                         <button class="btn btn--secondary test-btn" data-test="posttest">Post-Test</button>
                     </div>
-                    
                     <div class="questionnaire-form">
-                        <div class="form-header">
-                            <h3 id="test-title">Pre-Test Pengetahuan</h3>
-                            <p>Jawablah 6 pertanyaan berikut dengan memilih salah satu opsi yang paling sesuai.</p>
-                        </div>
-                        
                         <form id="questionnaire-form">
+                            <!-- Data Diri Pasien untuk Kuesioner -->
+                            <div class="patient-data-section">
+                                <div class="form-group">
+                                    <label class="form-label" for="q-patient-name">Nama Pasien</label>
+                                    <input type="text" class="form-control" id="q-patient-name" required>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label" for="q-patient-rm">Nomor RM</label>
+                                    <input type="text" class="form-control" id="q-patient-rm" required>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label" for="q-patient-dob">Tanggal Lahir</label>
+                                    <input type="date" class="form-control" id="q-patient-dob" required>
+                                </div>
+                            </div>
+                            <hr class="form-divider">
                             <div id="questions-container"></div>
-                            
                             <div class="form-actions">
-                                <button type="submit" class="btn btn--primary">
-                                    <i class="fas fa-paper-plane"></i> Kirim Jawaban
-                                </button>
-                                <button type="button" class="btn btn--secondary reset-btn">
-                                    <i class="fas fa-undo"></i> Reset
-                                </button>
+                                <button type="submit" class="btn btn--primary"><i class="fas fa-paper-plane"></i> Kirim Jawaban</button>
+                                <button type="button" class="btn btn--secondary reset-btn"><i class="fas fa-undo"></i> Reset</button>
                             </div>
                         </form>
-                        
                         <div id="results-container" class="results hidden">
-                            <div class="results-header">
-                                <h3>Hasil Kuesioner</h3>
-                            </div>
-                            <div class="results-content">
-                                <div class="score-display">
-                                    <div class="score-number" id="score-display">0</div>
-                                    <div class="score-total">dari 12</div>
-                                </div>
-                                <div class="interpretation" id="interpretation">
-                                </div>
-                                <div class="results-actions">
-                                    <button class="btn btn--secondary export-results">
-                                        <i class="fas fa-download"></i> Export PDF
-                                    </button>
-                                    <button class="btn btn--outline retry-btn">
-                                        <i class="fas fa-redo"></i> Coba Lagi
-                                    </button>
-                                </div>
-                            </div>
+                            <!-- Konten hasil akan muncul di sini -->
                         </div>
                     </div>
                 </div>
@@ -240,149 +170,70 @@
             <div id="observation-page" class="page">
                 <div class="page-header">
                     <h2>Lembar Observasi - Skala Mobilitas Pasca-Operasi (SMP-O)</h2>
-                    <button class="btn btn--primary btn--sm save-observation">
-                        <i class="fas fa-save"></i> Simpan Data
+                    <button class="btn btn--primary save-observation">
+                        <i class="fas fa-save"></i> Simpan Data ke Firebase
                     </button>
                 </div>
-                
                 <div class="observation-content">
                     <div class="patient-info">
-                        <h3>Informasi Pasien</h3>
+                        <h3>1. Informasi Pasien & Tindakan</h3>
                         <div class="info-grid">
                             <div class="form-group">
                                 <label class="form-label">Nama Pasien</label>
-                                <input type="text" class="form-control" id="patient-name" required>
+                                <input type="text" class="form-control" id="obs-patient-name" required>
                             </div>
                             <div class="form-group">
-                                <label class="form-label">Jenis Operasi</label>
-                                <input type="text" class="form-control" id="surgery-type" required>
+                                <label class="form-label">Nomor RM</label>
+                                <input type="text" class="form-control" id="obs-patient-rm" required>
                             </div>
                             <div class="form-group">
                                 <label class="form-label">Tanggal Operasi</label>
                                 <input type="date" class="form-control" id="surgery-date" required>
                             </div>
                             <div class="form-group">
-                                <label class="form-label">Tanggal/Jam Observasi</label>
+                                <label class="form-label">Jam Observasi</label>
                                 <input type="datetime-local" class="form-control" id="observation-time" required>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Tindakan Operasi</label>
+                                <button id="select-op-btn" class="btn btn--outline btn--full-width">Pilih Tindakan</button>
+                                <span id="selected-op" class="selected-value"></span>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Jenis Anestesi</label>
+                                <button id="select-anesthesia-btn" class="btn btn--outline btn--full-width">Pilih Jenis Anestesi</button>
+                                <span id="selected-anesthesia" class="selected-value"></span>
                             </div>
                         </div>
                     </div>
                     
                     <div class="mobility-scale">
-                        <h3>Skala Mobilitas Pasca-Operasi (SMP-O)</h3>
+                        <h3>2. Skala Mobilitas Pasca-Operasi (SMP-O)</h3>
                         <p class="scale-desc">Pilih level mobilitas yang sesuai dengan kondisi pasien saat ini:</p>
-                        
-                        <div class="mobility-levels">
-                            <div class="level-item" data-level="0">
-                                <div class="level-header">
-                                    <span class="level-number">0</span>
-                                    <h4>Pasif</h4>
-                                </div>
-                                <p>Pasien hanya berbaring, belum ada aktivitas</p>
-                            </div>
-                            
-                            <div class="level-item" data-level="1">
-                                <div class="level-header">
-                                    <span class="level-number">1</span>
-                                    <h4>Aktivitas di Tempat Tidur</h4>
-                                </div>
-                                <p>Mampu miring kanan/kiri, menggerakkan sendi kaki/tangan secara aktif</p>
-                            </div>
-                            
-                            <div class="level-item" data-level="2">
-                                <div class="level-header">
-                                    <span class="level-number">2</span>
-                                    <h4>Duduk di Tempat Tidur</h4>
-                                </div>
-                                <p>Mampu duduk tegak di tepi tempat tidur (kaki menggantung) selama >1 menit</p>
-                            </div>
-                            
-                            <div class="level-item" data-level="3">
-                                <div class="level-header">
-                                    <span class="level-number">3</span>
-                                    <h4>Berdiri</h4>
-                                </div>
-                                <p>Mampu berdiri di samping tempat tidur selama >30 detik (boleh dengan bantuan/pegangan)</p>
-                            </div>
-                            
-                            <div class="level-item" data-level="4">
-                                <div class="level-header">
-                                    <span class="level-number">4</span>
-                                    <h4>Transfer</h4>
-                                </div>
-                                <p>Mampu berpindah dari tempat tidur ke kursi secara mandiri/dengan sedikit bantuan</p>
-                            </div>
-                            
-                            <div class="level-item" data-level="5">
-                                <div class="level-header">
-                                    <span class="level-number">5</span>
-                                    <h4>Ambulasi di Kamar</h4>
-                                </div>
-                                <p>Mampu berjalan minimal 3 meter di dalam kamar</p>
-                            </div>
-                            
-                            <div class="level-item" data-level="6">
-                                <div class="level-header">
-                                    <span class="level-number">6</span>
-                                    <h4>Ambulasi di Luar Kamar</h4>
-                                </div>
-                                <p>Mampu berjalan di koridor/luar kamar</p>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="daily-targets">
-                        <h3>Target Harian</h3>
-                        <div class="targets-grid">
-                            <div class="target-card">
-                                <h4>Hari ke-0 (Hari Operasi)</h4>
-                                <div class="target-level">Level 1-2</div>
-                                <p>Aktivitas di tempat tidur & mulai duduk</p>
-                            </div>
-                            <div class="target-card">
-                                <h4>Hari ke-1 Pasca-Operasi</h4>
-                                <div class="target-level">Level 3-4</div>
-                                <p>Berdiri & transfer ke kursi</p>
-                            </div>
-                            <div class="target-card">
-                                <h4>Hari ke-2 Pasca-Operasi</h4>
-                                <div class="target-level">Level 5-6</div>
-                                <p>Mulai berjalan di kamar & koridor</p>
-                            </div>
+                        <div class="mobility-levels" id="mobility-levels-container">
+                            <!-- Level mobilisasi akan digenerate oleh JavaScript -->
                         </div>
                     </div>
 
                     <div class="safety-monitoring">
-                        <h3>Safety Monitoring</h3>
+                        <h3>3. Monitoring Keamanan</h3>
                         <div class="monitoring-grid">
-                            <div class="form-group">
-                                <label class="form-label">Skala Nyeri (0-10)</label>
-                                <input type="number" class="form-control" id="pain-scale" min="0" max="10">
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">Tekanan Darah</label>
-                                <input type="text" class="form-control" id="blood-pressure" placeholder="120/80">
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">Nadi (/menit)</label>
-                                <input type="number" class="form-control" id="pulse" min="40" max="200">
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">SpO₂ (%)</label>
-                                <input type="number" class="form-control" id="spo2" min="70" max="100">
-                            </div>
+                            <!-- Kolom monitoring keamanan -->
                         </div>
                     </div>
                     
                     <div class="notes-section">
-                        <h3>Catatan Penting</h3>
-                        <textarea class="form-control" id="observation-notes" rows="4" placeholder="Catatan observasi: tingkat nyeri, keluhan pasien, kebutuhan bantuan, hambatan yang dihadapi, atau hal penting lainnya..."></textarea>
-                    </div>
-
-                    <div class="nurse-signature">
-                        <div class="form-group">
-                            <label class="form-label">Paraf Perawat</label>
-                            <input type="text" class="form-control" id="nurse-signature" placeholder="Nama dan paraf perawat">
+                        <h3>4. Catatan & Paraf</h3>
+                        <div class="info-grid">
+                            <div class="form-group notes-group">
+                                <label class="form-label">Catatan Penting</label>
+                                <textarea class="form-control" id="observation-notes" rows="4" placeholder="Tingkat nyeri, keluhan, kebutuhan bantuan, hambatan..."></textarea>
+                            </div>
+                             <div class="form-group">
+                                <label class="form-label">Nama Perawat</label>
+                                <button id="select-nurse-btn" class="btn btn--outline btn--full-width">Pilih Perawat</button>
+                                <span id="selected-nurse" class="selected-value"></span>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -398,6 +249,22 @@
         </div>
     </div>
 
-    <script src="app.js"></script>
+    <!-- Modal Structure -->
+    <div id="selection-modal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modal-title">Pilih Opsi</h3>
+                <button class="modal-close-btn">&times;</button>
+            </div>
+            <div id="modal-list" class="modal-list">
+                <!-- Opsi akan dimasukkan di sini oleh JavaScript -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script type="module" src="app.js"></script>
+
 </body>
 </html>
+

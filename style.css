@@ -970,14 +970,6 @@ select.form-control {
 }
 
 /* Leaflet Page Styles */
-.leaflet-content {
-    background: var(--color-surface);
-    border: 1px solid var(--color-card-border);
-    border-radius: var(--radius-lg);
-    padding: var(--space-24);
-    box-shadow: var(--shadow-sm);
-}
-
 .leaflet-header {
     text-align: center;
     margin-bottom: var(--space-32);
@@ -1011,16 +1003,19 @@ select.form-control {
 
 .pdf-viewer-container {
     width: 100%;
-    height: 800px; /* Pastikan tinggi ini sama dengan di HTML */
+    height: 800px;
     border: 1px solid var(--color-border);
     border-radius: var(--radius-lg);
     overflow: hidden; /* Agar sudutnya rapi */
 }
 
-.pdf-viewer-container embed {
+/* PERUBAHAN: Mengganti selector dari 'embed' ke 'iframe' */
+.pdf-viewer-container iframe {
     width: 100%;
     height: 100%;
+    border: none; /* Menghilangkan border default dari iframe */
 }
+
 
 /* Video Page Styles */
 .video-content {

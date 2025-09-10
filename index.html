@@ -100,14 +100,12 @@
             <div id="leaflet-page" class="page">
                 <div class="page-header">
                     <h2>Leaflet Digital - Mobilisasi Dini</h2>
-                    <!-- Tombol download sekarang menjadi link biasa untuk men-trigger download -->
                     <a href="leaflet.pdf" download="Leaflet-Mobilisasi-Dini.pdf" class="btn btn--primary btn--sm">
                         <i class="fas fa-download"></i> Download PDF
                     </a>
                 </div>
                 <div class="leaflet-content">
                     <div class="pdf-viewer-container">
-                        <!-- Path diperbaiki untuk memuat file dari folder yang sama -->
                         <iframe src="leaflet.pdf"></iframe>
                     </div>
                 </div>
@@ -129,7 +127,10 @@
 
             <!-- Questionnaire Page -->
             <div id="questionnaire-page" class="page">
-                <div class="page-header"><h2>Kuesioner Pengetahuan (6 Soal)</h2></div>
+                <div class="page-header">
+                    <h2>Kuesioner Pengetahuan (6 Soal)</h2>
+                    <span id="test-mode-indicator" class="status status--info">Mode: Pre-Test</span>
+                </div>
                 <div class="questionnaire-content">
                     <div class="test-selector">
                         <button class="btn btn--primary test-btn active" data-test="pretest">Pre-Test</button>
@@ -137,7 +138,6 @@
                     </div>
                     <div class="questionnaire-form">
                         <form id="questionnaire-form">
-                            <!-- Data Diri Pasien untuk Kuesioner -->
                             <div class="patient-data-section">
                                 <div class="form-group">
                                     <label class="form-label" for="q-patient-name">Nama Pasien</label>
@@ -155,12 +155,24 @@
                             <hr class="form-divider">
                             <div id="questions-container"></div>
                             <div class="form-actions">
-                                <button type="submit" class="btn btn--primary"><i class="fas fa-paper-plane"></i> Kirim Jawaban</button>
+                                <button type="submit" class="btn btn--primary"><i class="fas fa-paper-plane"></i> Kirim Jawaban & Simpan</button>
                                 <button type="button" class="btn btn--secondary reset-btn"><i class="fas fa-undo"></i> Reset</button>
                             </div>
                         </form>
                         <div id="results-container" class="results hidden">
-                            <!-- Konten hasil akan muncul di sini -->
+                             <h3>Hasil Kuesioner</h3>
+                            <div class="results-content">
+                                <div class="score-display">
+                                    <div class="score-number" id="score-display">0</div>
+                                    <div class="score-total">dari 12</div>
+                                </div>
+                                <div class="interpretation" id="interpretation"></div>
+                                <div class="results-actions">
+                                    <button class="btn btn--outline retry-btn">
+                                        <i class="fas fa-redo"></i> Isi Ulang Kuesioner
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -197,7 +209,7 @@
                             <div class="form-group">
                                 <label class="form-label">Tindakan Operasi</label>
                                 <button id="select-op-btn" class="btn btn--outline btn--full-width">Pilih Tindakan</button>
-                                <span id="selected-op" class="selected-value"></span>
+                                <span id="selected-operation" class="selected-value"></span>
                             </div>
                             <div class="form-group">
                                 <label class="form-label">Jenis Anestesi</label>
@@ -214,16 +226,9 @@
                             <!-- Level mobilisasi akan digenerate oleh JavaScript -->
                         </div>
                     </div>
-
-                    <div class="safety-monitoring">
-                        <h3>3. Monitoring Keamanan</h3>
-                        <div class="monitoring-grid">
-                            <!-- Kolom monitoring keamanan -->
-                        </div>
-                    </div>
                     
                     <div class="notes-section">
-                        <h3>4. Catatan & Paraf</h3>
+                        <h3>3. Catatan & Paraf</h3>
                         <div class="info-grid">
                             <div class="form-group notes-group">
                                 <label class="form-label">Catatan Penting</label>
@@ -262,7 +267,6 @@
         </div>
     </div>
 
-    <!-- Firebase SDK -->
     <script type="module" src="app.js"></script>
 
 </body>

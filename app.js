@@ -32,10 +32,11 @@ const appData = {
 
 // --- INISIALISASI FIREBASE ---
 
-// 1. Deklarasikan variabel db dan auth di scope yang lebih tinggi
+// 1. Deklarasikan variabel yang akan digunakan di luar fungsi
 let db, auth;
+let appId; // <-- Deklarasikan variabel appId di sini
 
-// 2. Tempelkan konfigurasi Firebase baru Anda di sini
+// 2. Konfigurasi Firebase dari proyek Anda
 const firebaseConfig = {
   apiKey: "AIzaSyDXLA7gDQcQtoOrgdW2PnTmYg8q7YQ0OLU",
   authDomain: "mobilisasi-69979.firebaseapp.com",
@@ -46,25 +47,29 @@ const firebaseConfig = {
   measurementId: "G-HQL9JQBMN3"
 };
 
-// 3. Modifikasi fungsi initializeFirebase untuk menggunakan konfigurasi baru
+// 3. Fungsi untuk menginisialisasi Firebase
 async function initializeFirebase() {
     try {
-        // Initialize Firebase
+        // Inisialisasi aplikasi Firebase
         const app = initializeApp(firebaseConfig);
-        
-        // Initialize services
+
+        // !! PERBAIKAN: Tetapkan nilai appId dari konfigurasi
+        appId = firebaseConfig.appId;
+
+        // Inisialisasi layanan Firestore dan Auth
         db = getFirestore(app);
         auth = getAuth(app);
 
-        // Sign in user (anonymously in this case)
+        // Login secara anonim
         await signInAnonymously(auth);
         
         console.log("Firebase berhasil diinisialisasi. User:", auth.currentUser?.uid);
         
-        // Panggil fungsi lain yang bergantung pada Firebase setelah inisialisasi berhasil
+        // Sekarang panggil fungsi yang membutuhkan Firebase
         listenForPatientUpdates();
 
     } catch (error) {
+        // Tangani error jika inisialisasi gagal
         console.error("Gagal inisialisasi Firebase:", error);
         showToast("Gagal terhubung ke database.", "error");
     }

@@ -36,7 +36,7 @@
 
     <main class="main">
         <div class="container">
-            <!-- Landing & Other Pages (No Changes) -->
+            <!-- Landing & Other Pages -->
             <div id="landing-page" class="page active">
                 <div class="hero">
                     <div class="hero-content">
@@ -54,12 +54,52 @@
             </div>
             <div id="leaflet-page" class="page"><div class="page-header"><h2>Leaflet Digital - Mobilisasi Dini</h2><a href="leaflet.pdf" download="Leaflet-Mobilisasi-Dini.pdf" class="btn btn--primary btn--sm"><i class="fas fa-download"></i> Download PDF</a></div><div class="leaflet-content"><div class="pdf-viewer-container"><iframe src="leaflet.pdf"></iframe></div></div></div>
             <div id="video-page" class="page"><div class="page-header"><h2>Video Edukasi</h2></div><div class="video-content"><div class="video-placeholder"><i class="fas fa-play-circle"></i><h3>Video akan segera tersedia.</h3></div></div></div>
+            
+            <!-- Questionnaire Page (RESTORED) -->
             <div id="questionnaire-page" class="page">
                  <div class="page-header"><h2>Kuesioner Pengetahuan (6 Soal)</h2><span id="test-mode-indicator" class="status status--info">Mode: Pre-Test</span></div>
-                 <div class="questionnaire-content"><div class="test-selector"><button class="btn btn--primary test-btn active" data-test="pretest">Pre-Test</button><button class="btn btn--secondary test-btn" data-test="posttest">Post-Test</button></div><div class="questionnaire-form"><form id="questionnaire-form"><div class="patient-data-section"><div class="form-group"><label class="form-label" for="q-patient-name">Nama Pasien</label><input type="text" class="form-control" id="q-patient-name" required></div><div class="form-group"><label class="form-label" for="q-patient-rm">Nomor RM</label><input type="text" class="form-control" id="q-patient-rm" required></div><div class="form-group"><label class="form-label" for="q-patient-dob">Tanggal Lahir</label><input type="date" class="form-control" id="q-patient-dob" required></div></div><hr class="form-divider"><div id="questions-container"></div><div class="form-actions"><button type="submit" class="btn btn--primary"><i class="fas fa-paper-plane"></i> Kirim Jawaban & Simpan</button><button type="button" class="btn btn--secondary reset-btn"><i class="fas fa-undo"></i> Reset</button></div></form><div id="results-container" class="results hidden"><h3>Hasil Kuesioner</h3><div class="results-content"><div class="score-display"><div class="score-number" id="score-display">0</div><div class="score-total">dari 12</div></div><div class="interpretation" id="interpretation"></div><div class="results-actions"><button class="btn btn--outline retry-btn"><i class="fas fa-redo"></i> Isi Ulang Kuesioner</button></div></div></div></div></div>
+                 <div class="questionnaire-content">
+                     <div class="test-selector">
+                         <button class="btn btn--primary test-btn active" data-test="pretest">Pre-Test</button>
+                         <button class="btn btn--secondary test-btn" data-test="posttest">Post-Test</button>
+                     </div>
+                     <div class="questionnaire-form">
+                         <form id="questionnaire-form">
+                             <div class="patient-data-section">
+                                 <div class="form-group">
+                                     <label class="form-label" for="q-patient-name">Nama Pasien</label>
+                                     <input type="text" class="form-control" id="q-patient-name" required>
+                                 </div>
+                                 <div class="form-group">
+                                     <label class="form-label" for="q-patient-rm">Nomor RM</label>
+                                     <input type="text" class="form-control" id="q-patient-rm" required>
+                                 </div>
+                             </div>
+                             <hr class="form-divider">
+                             <div id="questions-container"></div>
+                             <div class="form-actions">
+                                 <button type="submit" class="btn btn--primary"><i class="fas fa-paper-plane"></i> Kirim Jawaban & Simpan</button>
+                                 <button type="button" class="btn btn--secondary reset-btn"><i class="fas fa-undo"></i> Reset</button>
+                             </div>
+                         </form>
+                         <div id="results-container" class="results hidden">
+                             <h3>Hasil Kuesioner</h3>
+                             <div class="results-content">
+                                 <div class="score-display">
+                                     <div class="score-number" id="score-display">0</div>
+                                     <div class="score-total">dari 12</div>
+                                 </div>
+                                 <div class="interpretation" id="interpretation"></div>
+                                 <div class="results-actions">
+                                     <button class="btn btn--outline retry-btn"><i class="fas fa-redo"></i> Isi Ulang Kuesioner</button>
+                                 </div>
+                             </div>
+                         </div>
+                     </div>
+                 </div>
             </div>
 
-            <!-- Observation Page (REWORKED) -->
+            <!-- Observation Page -->
             <div id="observation-page" class="page">
                 <div class="page-header">
                     <h2>Dasbor Pasien Pasca-Operasi</h2>
@@ -79,9 +119,7 @@
                                 <th>Aksi</th>
                             </tr>
                         </thead>
-                        <tbody id="patient-table-body">
-                            <!-- Data pasien akan dimuat di sini secara real-time -->
-                        </tbody>
+                        <tbody id="patient-table-body"></tbody>
                     </table>
                 </div>
             </div>
@@ -95,9 +133,7 @@
                 <h3 id="modal-title">Data Pasien</h3>
                 <button class="modal-close-btn">&times;</button>
             </div>
-            <div id="modal-body">
-                <!-- Konten form akan dimuat oleh JavaScript -->
-            </div>
+            <div id="modal-body" class="modal-body"></div>
         </div>
     </div>
     

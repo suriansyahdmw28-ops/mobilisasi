@@ -31,25 +31,41 @@ const appData = {
 };
 
 // --- INISIALISASI FIREBASE ---
-let db, auth;
-const appId = typeof __app_id !== 'undefined' ? __app_id : 'mlq-default-app';
-const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
 
+// 1. Deklarasikan variabel db dan auth di scope yang lebih tinggi
+let db, auth;
+
+// 2. Tempelkan konfigurasi Firebase baru Anda di sini
+const firebaseConfig = {
+  apiKey: "AIzaSyDXLA7gDQcQtoOrgdW2PnTmYg8q7YQ0OLU",
+  authDomain: "mobilisasi-69979.firebaseapp.com",
+  projectId: "mobilisasi-69979",
+  storageBucket: "mobilisasi-69979.firebasestorage.app",
+  messagingSenderId: "97383306678",
+  appId: "1:97383306678:web:559cfabae7d7ba24631d17",
+  measurementId: "G-HQL9JQBMN3"
+};
+
+// 3. Modifikasi fungsi initializeFirebase untuk menggunakan konfigurasi baru
 async function initializeFirebase() {
-    if (!firebaseConfig) return showToast("Konfigurasi Firebase tidak ditemukan.", "error");
     try {
+        // Initialize Firebase
         const app = initializeApp(firebaseConfig);
+        
+        // Initialize services
         db = getFirestore(app);
         auth = getAuth(app);
-        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-            await signInWithCustomToken(auth, __initial_auth_token);
-        } else {
-            await signInAnonymously(auth);
-        }
-        console.log("Firebase initialized. User:", auth.currentUser?.uid);
+
+        // Sign in user (anonymously in this case)
+        await signInAnonymously(auth);
+        
+        console.log("Firebase berhasil diinisialisasi. User:", auth.currentUser?.uid);
+        
+        // Panggil fungsi lain yang bergantung pada Firebase setelah inisialisasi berhasil
         listenForPatientUpdates();
+
     } catch (error) {
-        console.error("Firebase initialization error:", error);
+        console.error("Gagal inisialisasi Firebase:", error);
         showToast("Gagal terhubung ke database.", "error");
     }
 }

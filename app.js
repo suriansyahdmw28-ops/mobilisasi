@@ -4,30 +4,10 @@ import { getFirestore, collection, addDoc, setLogLevel } from "https://www.gstat
 import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
 // --- KONFIGURASI APLIKASI ---
-// Anda dapat dengan mudah mengubah daftar nama perawat, operasi, dan anestesi di sini
 const appData = {
-    nurses: [
-        "Suriansyah, S.Kep., Ns",
-        "Ahmad, S.Kep., Ns",
-        "Budiman, A.Md.Kep",
-        "Citra, S.Kep., Ns",
-        "Dewi, A.Md.Kep"
-    ],
-    operations: [
-        "Appendectomy",
-        "Hernia Repair",
-        "Laparotomy",
-        "Mastectomy",
-        "Cholecystectomy",
-        "Sectio Caesarea"
-    ],
-    anesthesiaTypes: [
-        "General Anesthesia",
-        "Spinal Anesthesia",
-        "Epidural Anesthesia",
-        "Regional Block"
-    ],
-    // Level mobilisasi disesuaikan dengan fase pada leaflet PDF
+    nurses: ["Suriansyah, S.Kep., Ns", "Ahmad, S.Kep., Ns", "Budiman, A.Md.Kep", "Citra, S.Kep., Ns", "Dewi, A.Md.Kep"],
+    operations: ["Appendectomy", "Hernia Repair", "Laparotomy", "Mastectomy", "Cholecystectomy", "Sectio Caesarea"],
+    anesthesiaTypes: ["General Anesthesia", "Spinal Anesthesia", "Epidural Anesthesia", "Regional Block"],
     mobilityScale: [
         {level: 0, name: "Level 0: Pasif", description: "Pasien hanya berbaring, belum ada aktivitas sama sekali."},
         {level: 1, name: "Level 1: Fase Sangat Dini (0-6 Jam)", description: "Latihan napas dalam, batuk efektif, gerak sendi tangan/kaki, dan miring kanan/kiri di tempat tidur."},
@@ -46,10 +26,7 @@ const appData = {
             { id: 5, text: "Jika terasa sangat nyeri saat bergerak, lebih baik berhenti dan panggil perawat.", type: "positive" },
             { id: 6, text: "Peran keluarga tidak penting, karena mobilisasi adalah tugas perawat sepenuhnya.", type: "negative" }
         ],
-        scoring: {
-            positive: { setuju: 2, ragu: 1, tidak_setuju: 0 },
-            negative: { setuju: 0, ragu: 1, tidak_setuju: 2 }
-        }
+        scoring: { positive: { setuju: 2, ragu: 1, tidak_setuju: 0 }, negative: { setuju: 0, ragu: 1, tidak_setuju: 2 } }
     }
 };
 
@@ -69,7 +46,6 @@ async function initializeFirebase() {
         db = getFirestore(app);
         auth = getAuth(app);
         setLogLevel('debug');
-
         if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
             await signInWithCustomToken(auth, __initial_auth_token);
         } else {
@@ -83,15 +59,10 @@ async function initializeFirebase() {
     }
 }
 
-
 // --- STATE APLIKASI ---
-let currentPage = 'landing';
+let currentTestType = 'pretest';
 let selectedMobilityLevel = null;
-let observationData = {
-    nurse: null,
-    operation: null,
-    anesthesia: null
-};
+let observationData = { nurse: null, operation: null, anesthesia: null };
 
 // --- FUNGSI UTAMA ---
 document.addEventListener('DOMContentLoaded', () => {
@@ -102,7 +73,6 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function setupEventListeners() {
-    // Navigasi
     document.querySelector('.nav-list').addEventListener('click', (e) => {
         const navItem = e.target.closest('.nav-item');
         if (navItem) navigateToPage(navItem.dataset.page);
@@ -112,11 +82,16 @@ function setupEventListeners() {
         if (menuCard) navigateToPage(menuCard.dataset.page);
     });
 
-    // Kuesioner
+    // Kuesioner Listeners
+    document.querySelector('.test-selector').addEventListener('click', (e) => {
+        const testBtn = e.target.closest('.test-btn');
+        if (testBtn) setActiveTest(testBtn.dataset.test);
+    });
     document.getElementById('questionnaire-form').addEventListener('submit', handleQuestionnaireSubmit);
     document.querySelector('.reset-btn').addEventListener('click', resetQuestionnaire);
-    
-    // Observasi
+    document.querySelector('.retry-btn').addEventListener('click', resetQuestionnaire);
+
+    // Observasi Listeners
     document.getElementById('mobility-levels-container').addEventListener('click', (e) => {
         const levelItem = e.target.closest('.level-item');
         if (levelItem) selectMobilityLevel(parseInt(levelItem.dataset.level));
@@ -124,9 +99,9 @@ function setupEventListeners() {
     document.querySelector('.save-observation').addEventListener('click', saveObservation);
 
     // Modal Listeners
-    document.getElementById('select-nurse-btn').addEventListener('click', () => openModal('nurse'));
-    document.getElementById('select-op-btn').addEventListener('click', () => openModal('operation'));
-    document.getElementById('select-anesthesia-btn').addEventListener('click', () => openModal('anesthesia'));
+    document.getElementById('select-nurse-btn').addEventListener('click', () => openModal('nurse', (v) => { observationData.nurse = v; }));
+    document.getElementById('select-op-btn').addEventListener('click', () => openModal('operation', (v) => { observationData.operation = v; }));
+    document.getElementById('select-anesthesia-btn').addEventListener('click', () => openModal('anesthesia', (v) => { observationData.anesthesia = v; }));
     document.querySelector('.modal-close-btn').addEventListener('click', closeModal);
     document.querySelector('.modal-overlay').addEventListener('click', (e) => {
         if (e.target.classList.contains('modal-overlay')) closeModal();
@@ -136,14 +111,11 @@ function setupEventListeners() {
 function navigateToPage(pageId) {
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
     document.getElementById(`${pageId}-page`).classList.add('active');
-    document.querySelectorAll('.nav-item').forEach(n => {
-        n.classList.toggle('active', n.dataset.page === pageId);
-    });
-    currentPage = pageId;
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.page === pageId));
 }
 
 // --- FUNGSI MODAL (POP-UP) ---
-function openModal(type) {
+function openModal(type, onSelectCallback) {
     const modal = document.getElementById('selection-modal');
     const title = document.getElementById('modal-title');
     const list = document.getElementById('modal-list');
@@ -151,18 +123,9 @@ function openModal(type) {
     
     let data, titleText;
     switch (type) {
-        case 'nurse':
-            data = appData.nurses;
-            titleText = 'Pilih Nama Perawat';
-            break;
-        case 'operation':
-            data = appData.operations;
-            titleText = 'Pilih Tindakan Operasi';
-            break;
-        case 'anesthesia':
-            data = appData.anesthesiaTypes;
-            titleText = 'Pilih Jenis Anestesi';
-            break;
+        case 'nurse': data = appData.nurses; titleText = 'Pilih Nama Perawat'; break;
+        case 'operation': data = appData.operations; titleText = 'Pilih Tindakan Operasi'; break;
+        case 'anesthesia': data = appData.anesthesiaTypes; titleText = 'Pilih Jenis Anestesi'; break;
     }
 
     title.textContent = titleText;
@@ -170,17 +133,14 @@ function openModal(type) {
         const button = document.createElement('button');
         button.className = 'modal-list-item';
         button.textContent = item;
-        button.onclick = () => selectModalItem(type, item);
+        button.onclick = () => {
+            document.getElementById(`selected-${type}`).textContent = item;
+            onSelectCallback(item);
+            closeModal();
+        };
         list.appendChild(button);
     });
-    
     modal.classList.remove('hidden');
-}
-
-function selectModalItem(type, value) {
-    observationData[type] = value;
-    document.getElementById(`selected-${type}`).textContent = value;
-    closeModal();
 }
 
 function closeModal() {
@@ -188,6 +148,18 @@ function closeModal() {
 }
 
 // --- FUNGSI KUESIONER ---
+function setActiveTest(testType) {
+    currentTestType = testType;
+    document.querySelectorAll('.test-btn').forEach(btn => {
+        const isActive = btn.dataset.test === testType;
+        btn.classList.toggle('active', isActive);
+        btn.classList.toggle('btn--primary', isActive);
+        btn.classList.toggle('btn--secondary', !isActive);
+    });
+    document.getElementById('test-mode-indicator').textContent = `Mode: ${testType === 'pretest' ? 'Pre-Test' : 'Post-Test'}`;
+    resetQuestionnaire();
+}
+
 function generateQuestionnaire() {
     const container = document.getElementById('questions-container');
     container.innerHTML = appData.questionnaire.questions.map((q, i) => `
@@ -202,13 +174,75 @@ function generateQuestionnaire() {
     `).join('');
 }
 
-function handleQuestionnaireSubmit(e) {
+async function handleQuestionnaireSubmit(e) {
     e.preventDefault();
-    // Logic untuk submit kuesioner (tidak diubah)
+    if (!db || !auth.currentUser) {
+        showToast("Database belum siap.", "error");
+        return;
+    }
+    
+    const patientName = document.getElementById('q-patient-name').value;
+    const patientRM = document.getElementById('q-patient-rm').value;
+    const patientDOB = document.getElementById('q-patient-dob').value;
+    
+    if (!patientName || !patientRM || !patientDOB) {
+        showToast("Harap lengkapi data diri pasien.", "error");
+        return;
+    }
+
+    const formData = new FormData(e.target);
+    let totalScore = 0;
+    const answers = {};
+    
+    for (const q of appData.questionnaire.questions) {
+        const answer = formData.get(`q_${q.id}`);
+        if (!answer) {
+            showToast("Harap jawab semua pertanyaan.", "warning");
+            return;
+        }
+        answers[q.id] = answer;
+        totalScore += appData.questionnaire.scoring[q.type][answer];
+    }
+    
+    const resultData = {
+        patientName, patientRM, patientDOB,
+        testType: currentTestType,
+        score: totalScore,
+        answers,
+        createdAt: new Date().toISOString(),
+        userId: auth.currentUser.uid,
+    };
+
+    try {
+        await addDoc(collection(db, 'artifacts', appId, 'users', auth.currentUser.uid, 'questionnaires'), resultData);
+        showToast("Hasil kuesioner berhasil disimpan!", "success");
+        displayResults(totalScore);
+    } catch (err) {
+        console.error("Error saving questionnaire: ", err);
+        showToast("Gagal menyimpan hasil. Cek konsol.", "error");
+    }
+}
+
+function displayResults(score) {
+    document.getElementById('questionnaire-form').classList.add('hidden');
+    const resultsContainer = document.getElementById('results-container');
+    resultsContainer.classList.remove('hidden');
+
+    document.getElementById('score-display').textContent = score;
+    const interpretationEl = document.getElementById('interpretation');
+    
+    let interp;
+    if (score >= 9) interp = { text: "Pengetahuan Baik", class: "good" };
+    else if (score >= 5) interp = { text: "Pengetahuan Cukup", class: "fair" };
+    else interp = { text: "Pengetahuan Kurang", class: "poor" };
+    
+    interpretationEl.innerHTML = `<h4>${interp.text}</h4>`;
+    interpretationEl.className = `interpretation ${interp.class}`;
 }
 
 function resetQuestionnaire() {
     document.getElementById('questionnaire-form').reset();
+    document.getElementById('questionnaire-form').classList.remove('hidden');
     document.getElementById('results-container').classList.add('hidden');
 }
 
@@ -227,36 +261,32 @@ function generateMobilityLevels() {
 }
 
 function selectMobilityLevel(level) {
-    document.querySelectorAll('.level-item').forEach(item => {
-        item.classList.toggle('selected', parseInt(item.dataset.level) === level);
-    });
+    if (level === null) {
+        document.querySelectorAll('.level-item.selected').forEach(i => i.classList.remove('selected'));
+    } else {
+        document.querySelectorAll('.level-item').forEach(item => {
+            item.classList.toggle('selected', parseInt(item.dataset.level) === level);
+        });
+    }
     selectedMobilityLevel = level;
 }
 
 async function saveObservation() {
     if (!db || !auth.currentUser) {
-        showToast("Database belum siap atau user belum login.", "error");
+        showToast("Database belum siap.", "error");
         return;
     }
-
-    // 1. Kumpulkan data dari form
     const patientName = document.getElementById('obs-patient-name').value;
     const patientRM = document.getElementById('obs-patient-rm').value;
     const surgeryDate = document.getElementById('surgery-date').value;
     const observationTime = document.getElementById('observation-time').value;
     
-    // 2. Validasi data
     if (!patientName || !patientRM || !surgeryDate || !observationTime || selectedMobilityLevel === null || !observationData.nurse || !observationData.operation || !observationData.anesthesia) {
         showToast("Harap lengkapi semua data sebelum menyimpan.", "error");
         return;
     }
-
-    // 3. Susun objek data
     const finalData = {
-        patientName,
-        patientRM,
-        surgeryDate,
-        observationTime,
+        patientName, patientRM, surgeryDate, observationTime,
         operation: observationData.operation,
         anesthesia: observationData.anesthesia,
         mobilityLevel: selectedMobilityLevel,
@@ -266,16 +296,17 @@ async function saveObservation() {
         createdAt: new Date().toISOString(),
         userId: auth.currentUser.uid,
     };
-
-    // 4. Kirim ke Firebase
     try {
-        const docRef = await addDoc(collection(db, 'artifacts', appId, 'users', auth.currentUser.uid, 'observations'), finalData);
-        console.log("Document written with ID: ", docRef.id);
+        await addDoc(collection(db, 'artifacts', appId, 'users', auth.currentUser.uid, 'observations'), finalData);
         showToast("Data observasi berhasil disimpan!", "success");
-        // Reset form setelah berhasil
+        // Reset form
         document.getElementById('obs-patient-name').value = '';
         document.getElementById('obs-patient-rm').value = '';
-        selectMobilityLevel(null); // Clear selection
+        selectMobilityLevel(null);
+        ['nurse', 'operation', 'anesthesia'].forEach(type => {
+            observationData[type] = null;
+            document.getElementById(`selected-${type}`).textContent = '';
+        });
     } catch (e) {
         console.error("Error adding document: ", e);
         showToast("Gagal menyimpan data. Cek konsol.", "error");
@@ -288,15 +319,10 @@ function showToast(message, type = 'info') {
     const toastIcon = toast.querySelector('.toast-icon');
     toast.querySelector('.toast-message').textContent = message;
     
-    const icons = {
-        success: 'fas fa-check-circle',
-        error: 'fas fa-times-circle',
-        info: 'fas fa-info-circle',
-    };
+    const icons = { success: 'fas fa-check-circle', error: 'fas fa-times-circle', warning: 'fas fa-exclamation-triangle', info: 'fas fa-info-circle' };
     toastIcon.className = `toast-icon ${icons[type]}`;
     toast.className = `toast show ${type}`;
     
-    setTimeout(() => {
-        toast.classList.remove('show');
-    }, 3000);
+    setTimeout(() => { toast.classList.remove('show'); }, 3000);
 }
+

@@ -1,7 +1,7 @@
 // Import Firebase services
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
 import { getFirestore, collection, addDoc, doc, onSnapshot, updateDoc, query, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
 // --- KONFIGURASI APLIKASI ---
 const appData = {
@@ -37,13 +37,20 @@ let patientsData = [];
 
 async function initializeFirebase() {
     try {
-        if (typeof __firebase_config === 'undefined') {
-            throw new Error("Konfigurasi Firebase tidak ditemukan. Aplikasi tidak dapat berjalan.");
-        }
+        // Konfigurasi Firebase dari Anda
+        const firebaseConfig = {
+            apiKey: "AIzaSyDXLA7gDQcQtoOrgdW2PnTmYg8q7YQ0OLU",
+            authDomain: "mobilisasi-69979.firebaseapp.com",
+            projectId: "mobilisasi-69979",
+            storageBucket: "mobilisasi-69979.firebasestorage.app",
+            messagingSenderId: "97383306678",
+            appId: "1:97383306678:web:559cfabae7d7ba24631d17",
+            measurementId: "G-HQL9JQBMN3"
+        };
         
-        appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const firebaseConfig = JSON.parse(__firebase_config);
-        
+        // Gunakan appId dari konfigurasi di atas
+        appId = firebaseConfig.appId;
+
         const app = initializeApp(firebaseConfig);
         db = getFirestore(app);
         auth = getAuth(app);
@@ -52,22 +59,24 @@ async function initializeFirebase() {
             if (user) {
                 userId = user.uid;
                 console.log("Firebase Authenticated. User ID:", userId);
-                listenForPatientUpdates(); // Start listening for data AFTER authentication.
+                listenForPatientUpdates(); // Mulai memuat data setelah otentikasi berhasil
             } else {
                 console.log("User not signed in.");
                 userId = null;
             }
         });
-
-        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-            await signInWithCustomToken(auth, __initial_auth_token);
-        } else {
-            await signInAnonymously(auth);
-        }
+        
+        // Login sebagai pengguna anonim
+        await signInAnonymously(auth);
 
     } catch (error) {
         console.error("Firebase Initialization Error:", error);
-        showToast(error.message, "error");
+        // Tampilkan pesan error yang lebih ramah di UI
+        const observationPage = document.getElementById('observation-page');
+        if (observationPage) {
+            observationPage.innerHTML = `<div class="error-panel"><h3><i class="fas fa-exclamation-triangle"></i> Gagal Terhubung ke Database</h3><p>Pastikan konfigurasi Firebase pada file <strong>app.js</strong> sudah benar. Error: ${error.message}</p></div>`;
+        }
+        showToast(`Error Inisialisasi: ${error.message}`, "error");
     }
 }
 
@@ -95,16 +104,23 @@ function setupEventListeners() {
     });
     
     // Kuesioner
-    document.querySelector('.test-selector').addEventListener('click', e => {
-        const testBtn = e.target.closest('.test-btn');
-        if (testBtn) setActiveTest(testBtn.dataset.test);
-    });
-    document.getElementById('questionnaire-form').addEventListener('submit', handleQuestionnaireSubmit);
-    document.querySelector('.reset-btn').addEventListener('click', resetQuestionnaire);
-    document.querySelector('.retry-btn').addEventListener('click', resetQuestionnaire);
+    const questionnairePage = document.getElementById('questionnaire-page');
+    if (questionnairePage) {
+        questionnairePage.querySelector('.test-selector').addEventListener('click', e => {
+            const testBtn = e.target.closest('.test-btn');
+            if (testBtn) setActiveTest(testBtn.dataset.test);
+        });
+        document.getElementById('questionnaire-form').addEventListener('submit', handleQuestionnaireSubmit);
+        questionnairePage.querySelector('.reset-btn').addEventListener('click', resetQuestionnaire);
+        questionnairePage.querySelector('.retry-btn').addEventListener('click', resetQuestionnaire);
+    }
 
     // Dasbor Pasien
-    document.getElementById('add-patient-btn').addEventListener('click', () => openPatientModal());
+    const addPatientBtn = document.getElementById('add-patient-btn');
+    if (addPatientBtn) {
+        addPatientBtn.addEventListener('click', () => openPatientModal());
+    }
+    
     document.body.addEventListener('click', e => {
         if (e.target.closest('.update-patient-btn')) {
             const patientId = e.target.closest('.update-patient-btn').dataset.id;
@@ -172,10 +188,12 @@ async function handleQuestionnaireSubmit(e) {
         totalScore += appData.questionnaire.scoring[q.type][answer];
     }
     
-    const resultData = { patientName, patientRM, testType: currentTestType, score: totalScore, answers, createdAt: new Date().toISOString(), userId };
+    // Menggunakan path yang konsisten
+    const collectionPath = `artifacts/${appId}/users/${userId}/questionnaires`;
+    const resultData = { patientName, patientRM, testType: currentTestType, score: totalScore, answers, createdAt: serverTimestamp(), userId };
     
     try {
-        await addDoc(collection(db, 'artifacts', appId, 'users', userId, 'questionnaires'), resultData);
+        await addDoc(collection(db, collectionPath), resultData);
         showToast("Hasil kuesioner berhasil disimpan!", "success");
         displayResults(totalScore);
     } catch (err) {
@@ -223,14 +241,15 @@ function populateNurseSelector() {
 }
 
 function listenForPatientUpdates() {
-    if (!userId) return; 
-    const q = query(collection(db, 'artifacts', appId, 'users', userId, 'patients'));
+    if (!userId || !appId) return; 
+    const collectionPath = `artifacts/${appId}/users/${userId}/patients`;
+    const q = query(collection(db, collectionPath));
     
     onSnapshot(q, snapshot => {
         patientsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         
-        const activePatients = patientsData.filter(p => p.status === 'aktif').sort((a,b) => b.surgeryFinishTime.seconds - a.surgeryFinishTime.seconds);
-        const archivedPatients = patientsData.filter(p => p.status === 'diarsipkan').sort((a,b) => b.dischargedAt?.seconds - a.dischargedAt?.seconds);
+        const activePatients = patientsData.filter(p => p.status === 'aktif' && p.surgeryFinishTime).sort((a,b) => b.surgeryFinishTime.seconds - a.surgeryFinishTime.seconds);
+        const archivedPatients = patientsData.filter(p => p.status === 'diarsipkan' && p.dischargedAt).sort((a,b) => b.dischargedAt.seconds - a.dischargedAt.seconds);
         
         renderPatientTable(activePatients);
         renderArchivedPatientTable(archivedPatients);
@@ -245,7 +264,7 @@ function renderPatientTable(patients) {
     const tableBody = document.getElementById('patient-table-body');
     if (!tableBody) return;
     if (patients.length === 0) {
-        tableBody.innerHTML = `<tr class="no-data-row"><td colspan="8">Belum ada data pasien aktif.</td></tr>`;
+        tableBody.innerHTML = `<tr class="no-data-row"><td colspan="8">Belum ada data pasien aktif. Klik 'Tambah Pasien Baru' untuk memulai.</td></tr>`;
         return;
     }
     tableBody.innerHTML = patients.map(p => {
@@ -386,12 +405,12 @@ async function saveNewPatient() {
 
     const initialObservation = {
         mobilityLevel: parseInt(document.getElementById('initial-mobility').value),
-        painScale: 0, // Default pain scale for initial entry
+        painScale: 0,
         ponv: document.getElementById('initial-ponv').value,
         rass: document.getElementById('initial-rass').value,
         notes: 'Data awal pasien.',
         nurse: selectedNurse,
-        timestamp: new Date()
+        timestamp: serverTimestamp()
     };
     
     const newPatient = {
@@ -405,7 +424,8 @@ async function saveNewPatient() {
         userId
     };
     try {
-        await addDoc(collection(db, 'artifacts', appId, 'users', userId, 'patients'), newPatient);
+        const collectionPath = `artifacts/${appId}/users/${userId}/patients`;
+        await addDoc(collection(db, collectionPath), newPatient);
         showToast("Pasien baru ditambahkan.", "success");
         closePatientModal();
     } catch (error) { 
@@ -429,10 +449,11 @@ async function savePatientUpdate(e) {
         rass: document.getElementById('update-rass').value,
         notes: document.getElementById('update-notes').value,
         nurse: selectedNurse,
-        timestamp: new Date()
+        timestamp: serverTimestamp()
     };
     try {
-        const patientRef = doc(db, 'artifacts', appId, 'users', userId, 'patients', patientId);
+        const docPath = `artifacts/${appId}/users/${userId}/patients/${patientId}`;
+        const patientRef = doc(db, docPath);
         await updateDoc(patientRef, {
             observationLog: [...(patient.observationLog || []), newObservation]
         });
@@ -448,7 +469,8 @@ async function dischargePatient(patientId) {
     if(!userId) return showToast("User tidak terautentikasi", "error");
     showConfirmationDialog("Apakah Anda yakin ingin menandai pasien ini sebagai 'Pulang'? Aksi ini tidak bisa dibatalkan.", async () => {
         try {
-            const patientRef = doc(db, 'artifacts', appId, 'users', userId, 'patients', patientId);
+            const docPath = `artifacts/${appId}/users/${userId}/patients/${patientId}`;
+            const patientRef = doc(db, docPath);
             await updateDoc(patientRef, {
                 status: 'diarsipkan',
                 dischargedAt: serverTimestamp()
@@ -471,9 +493,9 @@ function startRealtimeClocks() {
                el.textContent = formatElapsedTime(timestamp * 1000);
             }
         });
-    }, 1000 * 60); // Update every minute is enough
+    }, 1000 * 60); // Update setiap menit sudah cukup
     
-    // Initial call
+    // Panggil sekali di awal agar tidak kosong saat pertama dimuat
      document.querySelectorAll('.post-op-time').forEach(el => {
         const timestamp = parseInt(el.dataset.timestamp, 10);
         if (!isNaN(timestamp)) {
@@ -500,6 +522,7 @@ function formatElapsedTime(timestamp) {
 
 function showToast(message, type = 'info') {
     const toast = document.getElementById('toast');
+    if (!toast) return;
     toast.querySelector('.toast-message').textContent = message;
     const icons = { success: 'fas fa-check-circle', error: 'fas fa-times-circle', warning: 'fas fa-exclamation-triangle', info: 'fas fa-info-circle' };
     toast.querySelector('.toast-icon').className = `toast-icon ${icons[type]}`;
@@ -514,7 +537,7 @@ function showConfirmationDialog(message, onConfirm) {
     const dialog = document.createElement('div');
     dialog.id = 'custom-confirm-dialog';
     dialog.className = 'modal-overlay';
-    dialog.style.opacity = '0'; // Start hidden for transition
+    dialog.style.opacity = '0'; // Mulai tersembunyi untuk transisi
     dialog.innerHTML = `
         <div class="modal-content" style="max-width: 400px;">
             <div class="modal-header"><h3>Konfirmasi Tindakan</h3></div>
@@ -527,7 +550,7 @@ function showConfirmationDialog(message, onConfirm) {
     `;
 
     document.body.appendChild(dialog);
-    // Trigger transition
+    // Picu transisi
     setTimeout(() => {
         dialog.classList.remove('hidden');
         dialog.style.opacity = '1';
@@ -544,3 +567,4 @@ function showConfirmationDialog(message, onConfirm) {
     };
     document.getElementById('confirm-cancel').onclick = closeDialog;
 }
+

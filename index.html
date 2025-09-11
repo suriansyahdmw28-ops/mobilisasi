@@ -111,13 +111,24 @@
                 <!-- Penjelasan dan Kontrol Perawat -->
                 <div class="dashboard-controls">
                     <div class="info-panel">
-                        <strong>Keterangan Skala Mobilisasi:</strong>
-                        <p>
-                            <b>Level 0-1:</b> Pasif/Sangat Dini (gerak di tempat tidur). 
-                            <b>Level 2-3:</b> Dini/Progresif (duduk di tepi tempat tidur, berdiri). 
-                            <b>Level 4-6:</b> Aktif/Lanjutan (jalan di tempat, ke kamar mandi, pulih).
-                        </p>
-                        <p><b>RASS:</b> Sadar & Tenang (ideal). <b>PONV:</b> Tidak Ada (ideal).</p>
+                        <div class="info-section">
+                            <strong><i class="fas fa-walking"></i> Skala Mobilisasi</strong>
+                            <p>Tingkat kemampuan pasien bergerak. Level 0 (pasif) hingga 6 (pulih).</p>
+                        </div>
+                        <div class="info-section">
+                            <strong><i class="fas fa-brain"></i> RASS (Tingkat Kesadaran)</strong>
+                            <p>Mengukur tingkat kesadaran & agitasi. Target ideal: <b>0 (Sadar & Tenang)</b>.</p>
+                            <ul>
+                                <li>+1: Gelisah</li>
+                                <li>0: Sadar & Tenang</li>
+                                <li>-2: Respon suara</li>
+                                <li>-4: Tak ada respon</li>
+                            </ul>
+                        </div>
+                        <div class="info-section">
+                            <strong><i class="fas fa-wind"></i> PONV (Mual & Muntah)</strong>
+                            <p>Efek samping anestesi. Target ideal: <b>Tidak Ada</b>.</p>
+                        </div>
                     </div>
                     <div class="nurse-selector form-group">
                         <label for="current-nurse-selector" class="form-label">Nama Perawat Pencatat:</label>
@@ -189,3 +200,4 @@
     <script type="module" src="app.js"></script>
 </body>
 </html>
+

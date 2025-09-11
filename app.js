@@ -298,22 +298,31 @@ function populateNurseSelector() {
 }
 
 function listenForPatientUpdates() {
-    if (!userId || !appId) return; 
+    if (!userId || !appId) {
+        console.warn('listenForPatientUpdates() aborted — userId or appId missing', {userId, appId});
+        return;
+    }
     const collectionPath = `artifacts/${appId}/users/${userId}/patients`;
+    console.log('Listening to collectionPath =', collectionPath);
     const q = query(collection(db, collectionPath));
-    
-    onSnapshot(q, snapshot => {
-        patientsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        
-        // Sort aktif dan arsip seperti semula — gunakan helper getSecondsFromTS untuk kompatibilitas
-        const activePatients = patientsData.filter(p => p.status === 'aktif' && p.surgeryFinishTime).sort((a,b) => getSecondsFromTS(b.surgeryFinishTime) - getSecondsFromTS(a.surgeryFinishTime));
-        const archivedPatients = patientsData.filter(p => p.status === 'diarsipkan' && p.dischargedAt).sort((a,b) => getSecondsFromTS(b.dischargedAt) - getSecondsFromTS(a.dischargedAt));
-        
-        renderPatientTable(activePatients);
-        renderArchivedPatientTable(archivedPatients);
 
+    onSnapshot(q, snapshot => {
+        console.log('onSnapshot received — docs:', snapshot.size);
+        const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        console.log('docs preview:', docs.slice(0,5));
+        patientsData = docs;
+        // debug render call
+        console.log('renderPatientTable called with', patientsData.length);
+        try {
+            const activePatients = patientsData.filter(p => p.status === 'aktif' && p.surgeryFinishTime);
+            const archivedPatients = patientsData.filter(p => p.status === 'diarsipkan' && p.dischargedAt);
+            renderPatientTable(activePatients);
+            renderArchivedPatientTable(archivedPatients);
+        } catch(err) {
+            console.error('Error rendering patient tables', err);
+        }
     }, error => {
-        console.error("Error listening to patient updates:", error);
+        console.error('onSnapshot error:', error);
         showToast("Gagal memuat data pasien.", "error");
     });
 }

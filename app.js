@@ -297,106 +297,70 @@ function populateNurseSelector() {
     selector.innerHTML = appData.nurses.map(nurse => `<option value="${nurse}">${nurse}</option>`).join('');
 }
 
-// REPLACE listenForPatientUpdates WITH THIS DEBUG VERSION
 function listenForPatientUpdates() {
-    if (!userId || !appId) {
-        console.warn('listenForPatientUpdates() aborted — userId or appId missing', {userId, appId});
-        return;
-    }
-    const collectionPath = `artifacts/${appId}/users/${userId}/patients`;
-    console.log('Listening to collectionPath =', collectionPath);
-    const q = query(collection(db, collectionPath));
+    const patientsCollection = collection(db, `artifacts/${appId}/users/${userId}/patients`);
+    const q = query(patientsCollection);
 
-    onSnapshot(q, snapshot => {
-        console.log('onSnapshot received — docs:', snapshot.size);
-        const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        console.log('docs preview:', docs.slice(0,5));
-        patientsData = docs;
-        console.log('renderPatientTable called with', patientsData.length);
-        try {
-            const activePatients = patientsData.filter(p => p.status === 'aktif' && p.surgeryFinishTime);
-            const archivedPatients = patientsData.filter(p => p.status === 'diarsipkan' && p.dischargedAt);
-            renderPatientTable(activePatients);
-            renderArchivedPatientTable(archivedPatients);
-        } catch(err) {
-            console.error('Error rendering patient tables', err);
+    // Tampilkan pesan loading sebelum data siap
+    const noDataRow = document.querySelector('.no-data-row td');
+    if (noDataRow) {
+        noDataRow.innerHTML = 'Memuat data pasien...';
+    }
+
+    onSnapshot(q, (snapshot) => {
+        const newPatientsData = [];
+        snapshot.forEach((doc) => {
+            newPatientsData.push({ id: doc.id, ...doc.data() });
+        });
+        
+        // Simpan data ke variabel global
+        patientsData = newPatientsData;
+        
+        // Panggil fungsi render setiap kali ada perubahan data
+        renderPatientTable(); 
+
+    }, (error) => {
+        console.error("Error listening for patient updates:", error);
+        if (noDataRow) {
+            noDataRow.innerHTML = 'Gagal memuat data. Cek koneksi dan konfigurasi Firebase.';
         }
-    }, error => {
-        console.error('onSnapshot error:', error);
-        showToast("Gagal memuat data pasien.", "error");
     });
 }
 
-// REPLACE THE ENTIRE renderPatientTable FUNCTION WITH THIS
+
 function renderPatientTable(patients) {
-    console.log('[renderPatientTable] called with', patients?.length);
-    try {
-        const tableBody = document.getElementById('patient-table-body');
-        if (!tableBody) {
-            console.warn('[renderPatientTable] target #patient-table-body NOT FOUND. Creating fallback area.');
-            const container = document.getElementById('patient-table-container') || document.querySelector('.container') || document.body;
-            const existingFallback = document.getElementById('patient-table-fallback');
-            if (existingFallback) existingFallback.remove();
-            const fallback = document.createElement('div');
-            fallback.id = 'patient-table-fallback';
-            fallback.style.border = '1px dashed #d0d0d0';
-            fallback.style.padding = '12px';
-            fallback.style.margin = '12px';
-            fallback.innerHTML = `<strong>Debug:</strong> #patient-table-body tidak ditemukan. Terdeteksi ${patients?.length || 0} pasien. Periksa ID elemen atau layout.`;
-            container.prepend(fallback);
-            console.log('[renderPatientTable] fallback injected into', container);
-            return;
-        }
+    const tableBody = document.getElementById('patient-table-body');
+    if (!tableBody) return;
+    if (patients.length === 0) {
+        tableBody.innerHTML = `<tr class="no-data-row"><td colspan="8">Belum ada data pasien aktif. Klik 'Tambah Pasien Baru' untuk memulai.</td></tr>`;
+        return;
+    }
+    tableBody.innerHTML = patients.map(p => {
+        // Support legacy observationLog array OR new latestObservation field
+        const latestObs = p.latestObservation || (p.observationLog?.[p.observationLog.length - 1]) || { ponv: 'N/A', rass: 'N/A', mobilityLevel: 0, createdAt: { seconds: getSecondsFromTS(p.createdAt) } };
+        const idealMobility = calculateIdealMobility(p, latestObs);
+        const suggestion = generateActionSuggestion(latestObs.mobilityLevel, idealMobility.level, latestObs);
 
-        if (!patients || patients.length === 0) {
-            tableBody.innerHTML = `<tr class="no-data-row"><td colspan="8">Belum ada data pasien aktif. Klik 'Tambah Pasien Baru' untuk memulai.</td></tr>`;
-            console.log('[renderPatientTable] rendered empty state');
-            return;
-        }
-
-        const rows = patients.map(p => {
-            const latestObs = p.latestObservation || (Array.isArray(p.observationLog) ? p.observationLog[p.observationLog.length - 1] : null) || {};
-            const mobilityLevel = latestObs.mobilityLevel ?? 0;
-            const ponv = latestObs.ponv ?? 'N/A';
-            const rass = latestObs.rass ?? 'N/A';
-            const op = p.operation ?? 'N/A';
-            const anes = p.anesthesia ?? 'N/A';
-            const rm = p.rm ?? '';
-            const finishSeconds = (function(){
-                try { return getSecondsFromTS(p.surgeryFinishTime); } catch(e){ return 0; }
-            })();
-
-            return `<tr data-patient-id="${p.id}">
-                <td><strong>${escapeHtml(p.name||'Unnamed')}</strong><br><small>${escapeHtml(rm)}</small></td>
-                <td>${escapeHtml(op)}</td>
-                <td>${escapeHtml(anes)}</td>
-                <td class="post-op-time" data-timestamp="${finishSeconds}">${finishSeconds ? formatElapsedTime(finishSeconds*1000) : 'N/A'}</td>
-                <td>${escapeHtml(ponv)} / ${escapeHtml(rass)}</td>
-                <td><span class="status status-level-${mobilityLevel}">Level ${mobilityLevel}</span></td>
-                <td>—</td>
+        const finishSeconds = getSecondsFromTS(p.surgeryFinishTime);
+        return `
+            <tr>
+                <td><strong>${p.name}</strong><br><small>${p.rm}</small></td>
+                <td>${p.operation}</td>
+                <td>${p.anesthesia}</td>
+                <td class="post-op-time" data-timestamp="${finishSeconds}">${formatElapsedTime(finishSeconds * 1000)}</td>
+                <td>${latestObs.ponv} / ${latestObs.rass}</td>
+                <td><span class="status status-level-${latestObs.mobilityLevel}">Level ${latestObs.mobilityLevel}</span></td>
+                <td><span class="status status-level-${idealMobility.level}">${idealMobility.text}</span></td>
                 <td>
-                    <button class="btn update-patient-btn" data-id="${p.id}">Update</button>
-                    <button class="btn discharge-patient-btn" data-id="${p.id}">Pulang</button>
+                    <div class="suggestion-text">${suggestion}</div>
+                    <div class="action-buttons">
+                        <button class="btn btn--primary btn--sm update-patient-btn" data-id="${p.id}"><i class="fas fa-edit"></i> Update</button>
+                        <button class="btn btn--success btn--sm discharge-patient-btn" data-id="${p.id}"><i class="fas fa-check-circle"></i> Pulang</button>
+                    </div>
                 </td>
             </tr>`;
-        });
-
-        tableBody.innerHTML = rows.join('');
-        console.log('[renderPatientTable] rendered rows:', patients.length, '-> innerHTML length:', tableBody.innerHTML.length);
-
-    } catch (err) {
-        console.error('[renderPatientTable] error', err);
-    }
+    }).join('');
 }
-
-// helper to escape HTML
-function escapeHtml(str) {
-  if (!str && str !== 0) return '';
-  return String(str).replace(/[&<>"'`=\/]/g, function(s){
-    return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;','/':'&#x2F;','`':'&#x60;','=':'&#x3D;'})[s];
-  });
-}
-
 
 function renderArchivedPatientTable(patients) {
     const tableBody = document.getElementById('archived-patient-table-body');
@@ -658,3 +622,4 @@ function showConfirmationDialog(message, onConfirm) {
     };
     document.getElementById('confirm-cancel').onclick = closeDialog;
 }
+

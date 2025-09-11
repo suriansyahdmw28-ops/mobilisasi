@@ -1,3 +1,10 @@
+// app.js — modified to store observations in a subcollection per patient
+// - Patient documents are created in: artifacts/{appId}/users/{userId}/patients
+// - Observations are stored in subcollection: artifacts/{appId}/users/{userId}/patients/{patientId}/observations
+// - patient.latestObservation is kept as a quick summary (allows existing UI to keep working)
+// NOTE: This file is a drop-in replacement for your original app.js. It keeps most original logic
+// but replaces any array-based observation updates with subcollection writes + patient.latestObservation updates.
+
 // Import Firebase services
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
 import { getFirestore, collection, addDoc, doc, onSnapshot, updateDoc, query, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
@@ -71,13 +78,64 @@ async function initializeFirebase() {
 
     } catch (error) {
         console.error("Firebase Initialization Error:", error);
-        // Tampilkan pesan error yang lebih ramah di UI
         const observationPage = document.getElementById('observation-page');
         if (observationPage) {
             observationPage.innerHTML = `<div class="error-panel"><h3><i class="fas fa-exclamation-triangle"></i> Gagal Terhubung ke Database</h3><p>Pastikan konfigurasi Firebase pada file <strong>app.js</strong> sudah benar. Error: ${error.message}</p></div>`;
         }
         showToast(`Error Inisialisasi: ${error.message}`, "error");
     }
+}
+
+// --- UTILITY HELPERS ---
+function getSecondsFromTS(ts) {
+    if (!ts) return 0;
+    // Firestore Timestamp
+    if (typeof ts === 'object' && ts.seconds !== undefined) return ts.seconds;
+    // Timestamp-like with toDate()
+    if (ts && typeof ts.toDate === 'function') return Math.floor(ts.toDate().getTime()/1000);
+    // JavaScript Date
+    if (ts instanceof Date) return Math.floor(ts.getTime()/1000);
+    // ISO string / number
+    if (!isNaN(Number(ts))) return Number(ts);
+    return Math.floor(new Date(ts).getTime()/1000);
+}
+
+function formatElapsedTime(timestamp) {
+    const seconds = Math.floor((Date.now() - timestamp) / 1000);
+    if (seconds < 60) return `< 1 mnt`;
+
+    const days = Math.floor(seconds / 86400);
+    const hours = Math.floor((seconds % 86400) / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+
+    let result = '';
+    if (days > 0) result += `${days} hari `;
+    if (hours > 0) result += `${hours} jam `;
+    if (minutes > 0) result += `${minutes} mnt`;
+    
+    return result.trim() || 'Baru saja';
+}
+
+// Write a new observation into the patient's observations subcollection
+// and update patient.latestObservation (so UI can keep using a single field).
+async function addObservationToPatient(patientId, observation) {
+    const obsCollectionPath = `artifacts/${appId}/users/${userId}/patients/${patientId}/observations`;
+    const patientDocPath = `artifacts/${appId}/users/${userId}/patients/${patientId}`;
+
+    // 1) Add to observations subcollection (document will have createdAt server timestamp)
+    await addDoc(collection(db, obsCollectionPath), {
+        ...observation,
+        createdAt: serverTimestamp()
+    });
+
+    // 2) Update patient.latestObservation for quick access in UI
+    // Use serverTimestamp() safely here (it's not inside an array)
+    await updateDoc(doc(db, patientDocPath), {
+        latestObservation: {
+            ...observation,
+            createdAt: serverTimestamp()
+        }
+    });
 }
 
 // --- STATE APLIKASI & EVENT LISTENERS ---
@@ -188,7 +246,6 @@ async function handleQuestionnaireSubmit(e) {
         totalScore += appData.questionnaire.scoring[q.type][answer];
     }
     
-    // Menggunakan path yang konsisten
     const collectionPath = `artifacts/${appId}/users/${userId}/questionnaires`;
     const resultData = { patientName, patientRM, testType: currentTestType, score: totalScore, answers, createdAt: serverTimestamp(), userId };
     
@@ -248,8 +305,9 @@ function listenForPatientUpdates() {
     onSnapshot(q, snapshot => {
         patientsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         
-        const activePatients = patientsData.filter(p => p.status === 'aktif' && p.surgeryFinishTime).sort((a,b) => b.surgeryFinishTime.seconds - a.surgeryFinishTime.seconds);
-        const archivedPatients = patientsData.filter(p => p.status === 'diarsipkan' && p.dischargedAt).sort((a,b) => b.dischargedAt.seconds - a.dischargedAt.seconds);
+        // Sort aktif dan arsip seperti semula — gunakan helper getSecondsFromTS untuk kompatibilitas
+        const activePatients = patientsData.filter(p => p.status === 'aktif' && p.surgeryFinishTime).sort((a,b) => getSecondsFromTS(b.surgeryFinishTime) - getSecondsFromTS(a.surgeryFinishTime));
+        const archivedPatients = patientsData.filter(p => p.status === 'diarsipkan' && p.dischargedAt).sort((a,b) => getSecondsFromTS(b.dischargedAt) - getSecondsFromTS(a.dischargedAt));
         
         renderPatientTable(activePatients);
         renderArchivedPatientTable(archivedPatients);
@@ -268,16 +326,18 @@ function renderPatientTable(patients) {
         return;
     }
     tableBody.innerHTML = patients.map(p => {
-        const latestObs = p.observationLog?.[p.observationLog.length - 1] || { ponv: 'N/A', rass: 'N/A', mobilityLevel: 0 };
+        // Support legacy observationLog array OR new latestObservation field
+        const latestObs = p.latestObservation || (p.observationLog?.[p.observationLog.length - 1]) || { ponv: 'N/A', rass: 'N/A', mobilityLevel: 0, createdAt: { seconds: getSecondsFromTS(p.createdAt) } };
         const idealMobility = calculateIdealMobility(p, latestObs);
         const suggestion = generateActionSuggestion(latestObs.mobilityLevel, idealMobility.level, latestObs);
 
+        const finishSeconds = getSecondsFromTS(p.surgeryFinishTime);
         return `
             <tr>
                 <td><strong>${p.name}</strong><br><small>${p.rm}</small></td>
                 <td>${p.operation}</td>
                 <td>${p.anesthesia}</td>
-                <td class="post-op-time" data-timestamp="${p.surgeryFinishTime.seconds}">${formatElapsedTime(p.surgeryFinishTime.seconds * 1000)}</td>
+                <td class="post-op-time" data-timestamp="${finishSeconds}">${formatElapsedTime(finishSeconds * 1000)}</td>
                 <td>${latestObs.ponv} / ${latestObs.rass}</td>
                 <td><span class="status status-level-${latestObs.mobilityLevel}">Level ${latestObs.mobilityLevel}</span></td>
                 <td><span class="status status-level-${idealMobility.level}">${idealMobility.text}</span></td>
@@ -303,14 +363,14 @@ function renderArchivedPatientTable(patients) {
         <tr>
             <td><strong>${p.name}</strong><br><small>${p.rm}</small></td>
             <td>${p.operation}</td>
-            <td>${p.dischargedAt ? new Date(p.dischargedAt.seconds * 1000).toLocaleDateString('id-ID') : 'N/A'}</td>
+            <td>${p.dischargedAt ? new Date(getSecondsFromTS(p.dischargedAt) * 1000).toLocaleDateString('id-ID') : 'N/A'}</td>
             <td><button class="btn btn--secondary btn--sm" disabled>Diarsipkan</button></td>
         </tr>
     `).join('');
 }
 
 function calculateIdealMobility(patient, latestObs) {
-    const hoursPostOp = (Date.now() - (patient.surgeryFinishTime.seconds * 1000)) / (3600 * 1000);
+    const hoursPostOp = (Date.now() - (getSecondsFromTS(patient.surgeryFinishTime) * 1000)) / (3600 * 1000);
     
     if (latestObs.ponv !== 'Tidak Ada' || latestObs.rass !== 'Sadar & Tenang') {
         return { level: 1, text: "Level 1 (Atasi PONV/RASS)" };
@@ -332,7 +392,7 @@ function generateActionSuggestion(currentLevel, idealLevel, latestObs) {
         return '<strong>Pertahankan!</strong> Pasien sesuai target. Lanjutkan ke level berikutnya jika memungkinkan.';
     } else {
         const targetAction = appData.mobilityScale.find(s => s.level === idealLevel);
-        return `<strong>Ayo Kejar!</strong> Target selanjutnya adalah <strong>${targetAction.name}</strong>.`;
+        return `<strong>Ayo Kejar!</strong> Target selanjutnya adalah <strong>${targetAction.name}</strong>`;
     }
 }
 
@@ -373,7 +433,7 @@ function openPatientModal(patientId = null) {
     modalBody.innerHTML = isEditing ? updateForm : addForm;
 
     if (isEditing) {
-        const latestObs = patient.observationLog?.[patient.observationLog.length - 1] || {};
+        const latestObs = patient.latestObservation || (patient.observationLog?.[patient.observationLog.length - 1]) || {};
         document.getElementById('update-mobility').value = latestObs.mobilityLevel || 0;
         document.getElementById('update-pain').value = latestObs.painScale || 0;
         document.getElementById('update-ponv').value = latestObs.ponv || 'Tidak Ada';
@@ -393,6 +453,7 @@ function closePatientModal() {
     document.getElementById('patient-modal').classList.add('hidden');
 }
 
+// --- NEW: saveNewPatient using subcollection for observations ---
 async function saveNewPatient() {
     if(!userId) return showToast("User tidak terautentikasi", "error");
     const name = document.getElementById('patient-name').value;
@@ -409,8 +470,8 @@ async function saveNewPatient() {
         ponv: document.getElementById('initial-ponv').value,
         rass: document.getElementById('initial-rass').value,
         notes: 'Data awal pasien.',
-        nurse: selectedNurse,
-        timestamp: serverTimestamp()
+        nurse: selectedNurse
+        // createdAt will be set server-side in subcollection write
     };
     
     const newPatient = {
@@ -419,13 +480,17 @@ async function saveNewPatient() {
         anesthesia: document.getElementById('patient-anesthesia').value,
         surgeryFinishTime: new Date(finishTimeValue),
         createdAt: serverTimestamp(),
-        observationLog: [initialObservation],
+        // Keep latestObservation field for UI (set right after creating patient doc)
         status: 'aktif',
         userId
     };
     try {
         const collectionPath = `artifacts/${appId}/users/${userId}/patients`;
-        await addDoc(collection(db, collectionPath), newPatient);
+        const patientRef = await addDoc(collection(db, collectionPath), newPatient);
+
+        // Add observation to subcollection & set latestObservation on patient
+        await addObservationToPatient(patientRef.id, initialObservation);
+
         showToast("Pasien baru ditambahkan.", "success");
         closePatientModal();
     } catch (error) { 
@@ -434,6 +499,7 @@ async function saveNewPatient() {
     }
 }
 
+// --- NEW: savePatientUpdate writes to observations subcollection and updates latestObservation ---
 async function savePatientUpdate(e) {
     if(!userId) return showToast("User tidak terautentikasi", "error");
     const patientId = e.target.dataset.id;
@@ -448,15 +514,12 @@ async function savePatientUpdate(e) {
         ponv: document.getElementById('update-ponv').value,
         rass: document.getElementById('update-rass').value,
         notes: document.getElementById('update-notes').value,
-        nurse: selectedNurse,
-        timestamp: serverTimestamp()
+        nurse: selectedNurse
+        // createdAt set server-side
     };
     try {
-        const docPath = `artifacts/${appId}/users/${userId}/patients/${patientId}`;
-        const patientRef = doc(db, docPath);
-        await updateDoc(patientRef, {
-            observationLog: [...(patient.observationLog || []), newObservation]
-        });
+        // Add to subcollection and update patient.latestObservation
+        await addObservationToPatient(patientId, newObservation);
         showToast("Observasi berhasil diperbarui.", "success");
         closePatientModal();
     } catch (error) { 
@@ -483,7 +546,6 @@ async function dischargePatient(patientId) {
     });
 }
 
-
 // --- FUNGSI BANTUAN ---
 function startRealtimeClocks() {
     setInterval(() => {
@@ -502,22 +564,6 @@ function startRealtimeClocks() {
            el.textContent = formatElapsedTime(timestamp * 1000);
         }
     });
-}
-
-function formatElapsedTime(timestamp) {
-    const seconds = Math.floor((new Date() - timestamp) / 1000);
-    if (seconds < 60) return `< 1 mnt`;
-
-    const days = Math.floor(seconds / 86400);
-    const hours = Math.floor((seconds % 86400) / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-
-    let result = '';
-    if (days > 0) result += `${days} hari `;
-    if (hours > 0) result += `${hours} jam `;
-    if (minutes > 0) result += `${minutes} mnt`;
-    
-    return result.trim() || 'Baru saja';
 }
 
 function showToast(message, type = 'info') {
@@ -550,7 +596,6 @@ function showConfirmationDialog(message, onConfirm) {
     `;
 
     document.body.appendChild(dialog);
-    // Picu transisi
     setTimeout(() => {
         dialog.classList.remove('hidden');
         dialog.style.opacity = '1';
@@ -567,4 +612,3 @@ function showConfirmationDialog(message, onConfirm) {
     };
     document.getElementById('confirm-cancel').onclick = closeDialog;
 }
-

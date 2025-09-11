@@ -9,13 +9,13 @@ const appData = {
     operations: ["Appendectomy", "Hernia Repair", "Laparotomy", "Mastectomy", "Cholecystectomy", "Sectio Caesarea"],
     anesthesiaTypes: ["General Anesthesia", "Spinal Anesthesia", "Epidural Anesthesia", "Regional Block"],
     mobilityScale: [
-        {level: 0, name: "Level 0: Pasif"},
-        {level: 1, name: "Level 1: Fase Sangat Dini"},
-        {level: 2, name: "Level 2: Fase Dini"},
-        {level: 3, name: "Level 3: Fase Progresif"},
-        {level: 4, name: "Level 4: Fase Aktif Awal"},
-        {level: 5, name: "Level 5: Fase Aktif Lanjut"},
-        {level: 6, name: "Level 6: Fase Pemulihan"}
+        {level: 0, name: "Level 0: Tirah Baring", description: "Pasien pasif, semua gerakan dibantu perawat."},
+        {level: 1, name: "Level 1: Latihan Pasif/Aktif di Tempat Tidur", description: "Miring kanan-kiri, latihan rentang gerak."},
+        {level: 2, name: "Level 2: Duduk di Tepi Tempat Tidur", description: "Mulai mendudukkan pasien di sisi tempat tidur."},
+        {level: 3, name: "Level 3: Berdiri di Samping Tempat Tidur", description: "Latihan berdiri dengan bantuan."},
+        {level: 4, name: "Level 4: Berjalan Beberapa Langkah", description: "Mulai berjalan di sekitar tempat tidur."},
+        {level: 5, name: "Level 5: Berjalan di Koridor", description: "Berjalan lebih jauh di area ruangan/koridor."},
+        {level: 6, name: "Level 6: Mandiri", description: "Pasien mampu beraktivitas secara mandiri."}
     ],
     questionnaire: {
         questions: [
@@ -79,6 +79,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setupEventListeners();
     populateNurseSelector();
     generateQuestionnaire();
+    displayMobilityScaleInfo();
     startRealtimeClocks();
 });
 
@@ -204,6 +205,17 @@ function resetQuestionnaire() {
 }
 
 // --- FUNGSI DASBOR PASIEN ---
+function displayMobilityScaleInfo() {
+    const container = document.getElementById('mobility-scale-info');
+    if (!container) return;
+    container.innerHTML = appData.mobilityScale.map(level => `
+        <div class="mobility-level-item">
+            <span class="status status-level-${level.level}">Level ${level.level}</span>
+            <p><strong>${level.name}:</strong> ${level.description}</p>
+        </div>
+    `).join('');
+}
+
 function populateNurseSelector() {
     const selector = document.getElementById('current-nurse-selector');
     if(!selector) return;
@@ -239,6 +251,7 @@ function renderPatientTable(patients) {
     tableBody.innerHTML = patients.map(p => {
         const latestObs = p.observationLog?.[p.observationLog.length - 1] || { ponv: 'N/A', rass: 'N/A', mobilityLevel: 0 };
         const idealMobility = calculateIdealMobility(p, latestObs);
+        const suggestion = generateActionSuggestion(latestObs.mobilityLevel, idealMobility.level, latestObs);
 
         return `
             <tr>
@@ -247,9 +260,10 @@ function renderPatientTable(patients) {
                 <td>${p.anesthesia}</td>
                 <td class="post-op-time" data-timestamp="${p.surgeryFinishTime.seconds}">${formatElapsedTime(p.surgeryFinishTime.seconds * 1000)}</td>
                 <td>${latestObs.ponv} / ${latestObs.rass}</td>
-                <td><span class="status status-level-${idealMobility.level}">${idealMobility.text}</span></td>
                 <td><span class="status status-level-${latestObs.mobilityLevel}">Level ${latestObs.mobilityLevel}</span></td>
+                <td><span class="status status-level-${idealMobility.level}">${idealMobility.text}</span></td>
                 <td>
+                    <div class="suggestion-text">${suggestion}</div>
                     <div class="action-buttons">
                         <button class="btn btn--primary btn--sm update-patient-btn" data-id="${p.id}"><i class="fas fa-edit"></i> Update</button>
                         <button class="btn btn--success btn--sm discharge-patient-btn" data-id="${p.id}"><i class="fas fa-check-circle"></i> Pulang</button>
@@ -280,14 +294,27 @@ function calculateIdealMobility(patient, latestObs) {
     const hoursPostOp = (Date.now() - (patient.surgeryFinishTime.seconds * 1000)) / (3600 * 1000);
     
     if (latestObs.ponv !== 'Tidak Ada' || latestObs.rass !== 'Sadar & Tenang') {
-        return { level: 1, text: "Level 1 (Atasi Dulu PONV/RASS)" };
+        return { level: 1, text: "Level 1 (Atasi PONV/RASS)" };
     }
-    if (patient.anesthesia === "General Anesthesia" && hoursPostOp < 6) return { level: 1, text: "Level 1 (Pasca GA)"};
+    if (patient.anesthesia === "General Anesthesia" && hoursPostOp < 6) return { level: 1, text: "Level 1"};
     if (hoursPostOp < 2) return { level: 0, text: "Level 0" };
     if (hoursPostOp >= 2 && hoursPostOp < 6) return { level: 2, text: "Level 2" };
     if (hoursPostOp >= 6 && hoursPostOp < 12) return { level: 3, text: "Level 3" };
     if (hoursPostOp >= 12 && hoursPostOp < 24) return { level: 4, text: "Level 4" };
-    return { level: 5, text: "Level 5+" };
+    if (hoursPostOp >= 24 && hoursPostOp < 48) return { level: 5, text: "Level 5" };
+    return { level: 6, text: "Level 6" };
+}
+
+function generateActionSuggestion(currentLevel, idealLevel, latestObs) {
+    if (latestObs.ponv !== 'Tidak Ada') return '<strong>Prioritas:</strong> Atasi mual/muntah (PONV).';
+    if (latestObs.rass !== 'Sadar & Tenang') return '<strong>Prioritas:</strong> Stabilkan kesadaran (RASS).';
+
+    if (currentLevel >= idealLevel) {
+        return '<strong>Pertahankan!</strong> Pasien sesuai target. Lanjutkan ke level berikutnya jika memungkinkan.';
+    } else {
+        const targetAction = appData.mobilityScale.find(s => s.level === idealLevel);
+        return `<strong>Ayo Kejar!</strong> Target selanjutnya adalah <strong>${targetAction.name}</strong>.`;
+    }
 }
 
 function openPatientModal(patientId = null) {
@@ -304,6 +331,13 @@ function openPatientModal(patientId = null) {
             <div class="form-group full-width"><label for="patient-anesthesia">Jenis Anestesi</label><select id="patient-anesthesia" class="form-control">${appData.anesthesiaTypes.map(an=>`<option>${an}</option>`).join('')}</select></div>
             <div class="form-group full-width"><label for="patient-finish-time">Waktu Selesai Operasi</label><input type="datetime-local" id="patient-finish-time" class="form-control" required></div>
         </div>
+        <hr class="form-divider">
+        <h4>Observasi Awal</h4>
+        <div class="modal-grid">
+            <div class="form-group"><label>Mual/Muntah (PONV)</label><select id="initial-ponv" class="form-control"><option>Tidak Ada</option><option>Ringan</option><option>Berat</option></select></div>
+            <div class="form-group"><label>Tingkat Kesadaran (RASS)</label><select id="initial-rass" class="form-control"><option>Sadar & Tenang</option><option>Mengantuk</option><option>Respon suara</option><option>Tak ada respon</option></select></div>
+            <div class="form-group full-width"><label>Mobilisasi Saat Ini</label><select id="initial-mobility" class="form-control">${appData.mobilityScale.map(s=>`<option value="${s.level}">${s.name}</option>`).join('')}</select></div>
+        </div>
         <div class="modal-footer"><button class="btn btn--primary" id="save-new-patient-btn">Simpan Pasien</button></div>`;
         
     const updateForm = `
@@ -312,7 +346,7 @@ function openPatientModal(patientId = null) {
             <div class="form-group full-width"><label>Update Skala Mobilitas</label><select id="update-mobility" class="form-control">${appData.mobilityScale.map(s=>`<option value="${s.level}">${s.name}</option>`).join('')}</select></div>
             <div class="form-group"><label>Skala Nyeri (0-10)</label><input type="number" id="update-pain" class="form-control" min="0" max="10" value="0"></div>
             <div class="form-group"><label>Mual/Muntah (PONV)</label><select id="update-ponv" class="form-control"><option>Tidak Ada</option><option>Ringan</option><option>Berat</option></select></div>
-            <div class="form-group full-width"><label>Tingkat Kesadaran (RASS)</label><select id="update-rass" class="form-control"><option>Sadar & Tenang</option><option>Mengantuk</option><option>Respon suara</option><option>Tak ada respon</option></select></div>
+            <div class="form-group"><label>Tingkat Kesadaran (RASS)</label><select id="update-rass" class="form-control"><option>Sadar & Tenang</option><option>Mengantuk</option><option>Respon suara</option><option>Tak ada respon</option></select></div>
             <div class="form-group full-width"><label>Catatan Tambahan</label><textarea id="update-notes" class="form-control" rows="2"></textarea></div>
         </div>
         <div class="modal-footer"><button class="btn btn--primary" id="save-update-btn" data-id="${patientId}">Simpan Observasi</button></div>`;
@@ -345,8 +379,20 @@ async function saveNewPatient() {
     const name = document.getElementById('patient-name').value;
     const rm = document.getElementById('patient-rm').value;
     const finishTimeValue = document.getElementById('patient-finish-time').value;
+    const selectedNurse = document.getElementById('current-nurse-selector').value;
     
-    if (!name || !rm || !finishTimeValue) return showToast("Harap lengkapi semua field.", "error");
+    if (!name || !rm || !finishTimeValue) return showToast("Harap lengkapi data pasien.", "error");
+    if (!selectedNurse) return showToast("Pilih nama perawat terlebih dahulu.", "warning");
+
+    const initialObservation = {
+        mobilityLevel: parseInt(document.getElementById('initial-mobility').value),
+        painScale: 0, // Default pain scale for initial entry
+        ponv: document.getElementById('initial-ponv').value,
+        rass: document.getElementById('initial-rass').value,
+        notes: 'Data awal pasien.',
+        nurse: selectedNurse,
+        timestamp: new Date()
+    };
     
     const newPatient = {
         name, rm, 
@@ -354,7 +400,7 @@ async function saveNewPatient() {
         anesthesia: document.getElementById('patient-anesthesia').value,
         surgeryFinishTime: new Date(finishTimeValue),
         createdAt: serverTimestamp(),
-        observationLog: [],
+        observationLog: [initialObservation],
         status: 'aktif',
         userId
     };
@@ -425,7 +471,15 @@ function startRealtimeClocks() {
                el.textContent = formatElapsedTime(timestamp * 1000);
             }
         });
-    }, 1000); // Update every second for more "real-time" feel
+    }, 1000 * 60); // Update every minute is enough
+    
+    // Initial call
+     document.querySelectorAll('.post-op-time').forEach(el => {
+        const timestamp = parseInt(el.dataset.timestamp, 10);
+        if (!isNaN(timestamp)) {
+           el.textContent = formatElapsedTime(timestamp * 1000);
+        }
+    });
 }
 
 function formatElapsedTime(timestamp) {
@@ -441,7 +495,7 @@ function formatElapsedTime(timestamp) {
     if (hours > 0) result += `${hours} jam `;
     if (minutes > 0) result += `${minutes} mnt`;
     
-    return result.trim();
+    return result.trim() || 'Baru saja';
 }
 
 function showToast(message, type = 'info') {
@@ -490,4 +544,3 @@ function showConfirmationDialog(message, onConfirm) {
     };
     document.getElementById('confirm-cancel').onclick = closeDialog;
 }
-

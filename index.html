@@ -55,7 +55,7 @@
             <div id="leaflet-page" class="page"><div class="page-header"><h2>Leaflet Digital - Mobilisasi Dini</h2><a href="leaflet.pdf" download="Leaflet-Mobilisasi-Dini.pdf" class="btn btn--primary btn--sm"><i class="fas fa-download"></i> Download PDF</a></div><div class="leaflet-content"><div class="pdf-viewer-container"><iframe src="leaflet.pdf"></iframe></div></div></div>
             <div id="video-page" class="page"><div class="page-header"><h2>Video Edukasi</h2></div><div class="video-content"><div class="video-placeholder"><i class="fas fa-play-circle"></i><h3>Video akan segera tersedia.</h3></div></div></div>
             
-            <!-- Questionnaire Page (RESTORED) -->
+            <!-- Questionnaire Page -->
             <div id="questionnaire-page" class="page">
                  <div class="page-header"><h2>Kuesioner Pengetahuan (6 Soal)</h2><span id="test-mode-indicator" class="status status--info">Mode: Pre-Test</span></div>
                  <div class="questionnaire-content">
@@ -107,20 +107,65 @@
                         <i class="fas fa-user-plus"></i> Tambah Pasien Baru
                     </button>
                 </div>
+                
+                <!-- Penjelasan dan Kontrol Perawat -->
+                <div class="dashboard-controls">
+                    <div class="info-panel">
+                        <strong>Keterangan Skala Mobilisasi:</strong>
+                        <p>
+                            <b>Level 0-1:</b> Pasif/Sangat Dini (gerak di tempat tidur). 
+                            <b>Level 2-3:</b> Dini/Progresif (duduk di tepi tempat tidur, berdiri). 
+                            <b>Level 4-6:</b> Aktif/Lanjutan (jalan di tempat, ke kamar mandi, pulih).
+                        </p>
+                        <p><b>RASS:</b> Sadar & Tenang (ideal). <b>PONV:</b> Tidak Ada (ideal).</p>
+                    </div>
+                    <div class="nurse-selector form-group">
+                        <label for="current-nurse-selector" class="form-label">Nama Perawat Pencatat:</label>
+                        <select id="current-nurse-selector" class="form-control">
+                            <!-- Opsi perawat akan ditambahkan oleh JavaScript -->
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Tabel Pasien Aktif -->
                 <div class="table-container">
                     <table class="patient-table">
                         <thead>
                             <tr>
-                                <th>Nama Pasien</th>
-                                <th>RM</th>
+                                <th>Nama Pasien (RM)</th>
                                 <th>Jenis Operasi</th>
-                                <th>Waktu Pasca-OP</th>
-                                <th>Mobilitas Terkini</th>
-                                <th>Aksi</th>
+                                <th>Jenis Anestesi</th>
+                                <th>Lama Pasca-OP</th>
+                                <th>PONV / RASS</th>
+                                <th>Mobilisasi Ideal</th>
+                                <th>Mobilisasi Sekarang</th>
+                                <th>Saran / Aksi</th>
                             </tr>
                         </thead>
-                        <tbody id="patient-table-body"></tbody>
+                        <tbody id="patient-table-body">
+                            <!-- Data pasien aktif akan di-render di sini -->
+                        </tbody>
                     </table>
+                </div>
+
+                <!-- Arsip Pasien Pulang -->
+                <div class="archive-section">
+                    <h3><i class="fas fa-archive"></i> Arsip Pasien Pulang</h3>
+                    <div class="table-container">
+                        <table class="patient-table">
+                            <thead>
+                                <tr>
+                                    <th>Nama Pasien (RM)</th>
+                                    <th>Jenis Operasi</th>
+                                    <th>Tanggal Pulang</th>
+                                    <th>Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody id="archived-patient-table-body">
+                                <!-- Data pasien yang diarsipkan akan di-render di sini -->
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>
@@ -144,4 +189,3 @@
     <script type="module" src="app.js"></script>
 </body>
 </html>
-

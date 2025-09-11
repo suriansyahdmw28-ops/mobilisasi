@@ -181,6 +181,26 @@
         </div>
     </div>
     
+    <!-- PERUBAHAN: Modal untuk memasukkan ID Klinik -->
+    <div id="clinic-id-modal" class="modal-overlay hidden">
+        <div class="modal-content" style="max-width: 450px;">
+            <div class="modal-header">
+                <h3 id="clinic-id-modal-title">ID Klinik / Ruangan</h3>
+            </div>
+            <div id="clinic-id-modal-body" class="modal-body">
+                <p>Masukkan ID unik untuk klinik atau ruangan Anda untuk menyimpan dan menyinkronkan data pasien.</p>
+                <p><small><strong>Penting:</strong> Gunakan ID yang sama setiap kali Anda membuka aplikasi ini di perangkat baru atau setelah membersihkan cache.</small></p>
+                <div class="form-group" style="margin-top: 16px;">
+                    <label for="clinic-id-input" class="form-label">Contoh: R-BEDAH-LANTAI-2</label>
+                    <input type="text" id="clinic-id-input" class="form-control" placeholder="Masukkan ID unik Anda di sini...">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn--primary" id="save-clinic-id-btn">Simpan & Lanjutkan</button>
+            </div>
+        </div>
+    </div>
+
     <div id="toast" class="toast hidden">
         <div class="toast-content"><i class="toast-icon"></i><span class="toast-message"></span></div>
     </div>

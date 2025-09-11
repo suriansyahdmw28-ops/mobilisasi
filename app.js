@@ -126,12 +126,6 @@ function navigateToPage(pageId) {
 }
 
 // --- FUNGSI KUESIONER ---
-function setActiveTest(testType) { /* ... implementation unchanged ... */ }
-function generateQuestionnaire() { /* ... implementation unchanged ... */ }
-async function handleQuestionnaireSubmit(e) { /* ... implementation unchanged ... */ }
-function displayResults(score) { /* ... implementation unchanged ... */ }
-function resetQuestionnaire() { /* ... implementation unchanged ... */ }
-// Placeholder for unchanged questionnaire functions
 function setActiveTest(testType) {
     currentTestType = testType;
     document.querySelectorAll('.test-btn').forEach(btn => {
@@ -143,6 +137,7 @@ function setActiveTest(testType) {
     document.getElementById('test-mode-indicator').textContent = `Mode: ${testType === 'pretest' ? 'Pre-Test' : 'Post-Test'}`;
     resetQuestionnaire();
 }
+
 function generateQuestionnaire() {
     const container = document.getElementById('questions-container');
     if(!container) return;
@@ -156,6 +151,7 @@ function generateQuestionnaire() {
             </div>
         </div>`).join('');
 }
+
 async function handleQuestionnaireSubmit(e) {
     e.preventDefault();
     if (!userId) return showToast("Database belum siap.", "error");
@@ -186,6 +182,7 @@ async function handleQuestionnaireSubmit(e) {
         showToast("Gagal menyimpan hasil.", "error");
     }
 }
+
 function displayResults(score) {
     document.getElementById('questionnaire-form').classList.add('hidden');
     const resultsContainer = document.getElementById('results-container');
@@ -199,6 +196,7 @@ function displayResults(score) {
     interpEl.innerHTML = `<h4>${interp.text}</h4>`;
     interpEl.className = `interpretation ${interp.class}`;
 }
+
 function resetQuestionnaire() {
     document.getElementById('questionnaire-form').reset();
     document.getElementById('questionnaire-form').classList.remove('hidden');

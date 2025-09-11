@@ -298,69 +298,49 @@ function populateNurseSelector() {
 }
 
 function listenForPatientUpdates() {
-    const patientsCollection = collection(db, `artifacts/${appId}/users/${userId}/patients`);
-    const q = query(patientsCollection);
+  if (!userId || !appId) return;
 
-    // Tampilkan pesan loading sebelum data siap
-    const noDataRow = document.querySelector('.no-data-row td');
-    if (noDataRow) {
-        noDataRow.innerHTML = 'Memuat data pasien...';
-    }
-
-    onSnapshot(q, (snapshot) => {
-        const newPatientsData = [];
-        snapshot.forEach((doc) => {
-            newPatientsData.push({ id: doc.id, ...doc.data() });
-        });
-        
-        // Simpan data ke variabel global
-        patientsData = newPatientsData;
-        
-        // Panggil fungsi render setiap kali ada perubahan data
-        renderPatientTable(); 
-
-    }, (error) => {
-        console.error("Error listening for patient updates:", error);
-        if (noDataRow) {
-            noDataRow.innerHTML = 'Gagal memuat data. Cek koneksi dan konfigurasi Firebase.';
-        }
+  const patientsRef = collection(db, 'artifacts', appId, 'users', userId, 'patients');
+  onSnapshot(patientsRef, (querySnapshot) => {
+    patientsData = [];
+    querySnapshot.forEach((doc) => {
+      const patient = doc.data();
+      patient.id = doc.id;
+      patientsData.push(patient);
     });
+    renderPatientsTable();
+  }, (error) => {
+    console.error('Error loading patients:', error);
+  });
 }
 
+function renderPatientsTable() {
+  const tableBody = document.getElementById('patient-table-body');
+  if (!tableBody) return;
 
-function renderPatientTable(patients) {
-    const tableBody = document.getElementById('patient-table-body');
-    if (!tableBody) return;
-    if (patients.length === 0) {
-        tableBody.innerHTML = `<tr class="no-data-row"><td colspan="8">Belum ada data pasien aktif. Klik 'Tambah Pasien Baru' untuk memulai.</td></tr>`;
-        return;
-    }
-    tableBody.innerHTML = patients.map(p => {
-        // Support legacy observationLog array OR new latestObservation field
-        const latestObs = p.latestObservation || (p.observationLog?.[p.observationLog.length - 1]) || { ponv: 'N/A', rass: 'N/A', mobilityLevel: 0, createdAt: { seconds: getSecondsFromTS(p.createdAt) } };
-        const idealMobility = calculateIdealMobility(p, latestObs);
-        const suggestion = generateActionSuggestion(latestObs.mobilityLevel, idealMobility.level, latestObs);
+  tableBody.innerHTML = '';
 
-        const finishSeconds = getSecondsFromTS(p.surgeryFinishTime);
-        return `
-            <tr>
-                <td><strong>${p.name}</strong><br><small>${p.rm}</small></td>
-                <td>${p.operation}</td>
-                <td>${p.anesthesia}</td>
-                <td class="post-op-time" data-timestamp="${finishSeconds}">${formatElapsedTime(finishSeconds * 1000)}</td>
-                <td>${latestObs.ponv} / ${latestObs.rass}</td>
-                <td><span class="status status-level-${latestObs.mobilityLevel}">Level ${latestObs.mobilityLevel}</span></td>
-                <td><span class="status status-level-${idealMobility.level}">${idealMobility.text}</span></td>
-                <td>
-                    <div class="suggestion-text">${suggestion}</div>
-                    <div class="action-buttons">
-                        <button class="btn btn--primary btn--sm update-patient-btn" data-id="${p.id}"><i class="fas fa-edit"></i> Update</button>
-                        <button class="btn btn--success btn--sm discharge-patient-btn" data-id="${p.id}"><i class="fas fa-check-circle"></i> Pulang</button>
-                    </div>
-                </td>
-            </tr>`;
-    }).join('');
+  if (patientsData.length === 0) {
+    tableBody.innerHTML = '<tr><td colspan="8" class="no-data-row">Data pasien tidak ditemukan.</td></tr>';
+    return;
+  }
+
+  patientsData.forEach(patient => {
+    const row = document.createElement('tr');
+    row.innerHTML = `
+      <td>${patient.name || '-'}</td>
+      <td>${patient.operation || '-'}</td>
+      <td>${patient.anesthesia || '-'}</td>
+      <td>${patient.postOpDuration || '-'}</td>
+      <td>${patient.ponvRass || '-'}</td>
+      <td>${patient.currentMobilization || '-'}</td>
+      <td>${patient.idealMobilization || '-'}</td>
+      <td>${patient.action || '-'}</td>
+    `;
+    tableBody.appendChild(row);
+  });
 }
+
 
 function renderArchivedPatientTable(patients) {
     const tableBody = document.getElementById('archived-patient-table-body');
@@ -622,4 +602,3 @@ function showConfirmationDialog(message, onConfirm) {
     };
     document.getElementById('confirm-cancel').onclick = closeDialog;
 }
-

@@ -125,13 +125,7 @@ function navigateToPage(pageId) {
     document.querySelectorAll('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.page === pageId));
 }
 
-// --- FUNGSI KUESIONER (Tidak berubah) ---
-function setActiveTest(testType) { /* ... */ }
-function generateQuestionnaire() { /* ... */ }
-async function handleQuestionnaireSubmit(e) { /* ... */ }
-function displayResults(score) { /* ... */ }
-function resetQuestionnaire() { /* ... */ }
-// Placeholder for unchanged questionnaire functions
+// --- FUNGSI KUESIONER ---
 function setActiveTest(testType) {
     currentTestType = testType;
     document.querySelectorAll('.test-btn').forEach(btn => {
@@ -143,6 +137,7 @@ function setActiveTest(testType) {
     document.getElementById('test-mode-indicator').textContent = `Mode: ${testType === 'pretest' ? 'Pre-Test' : 'Post-Test'}`;
     resetQuestionnaire();
 }
+
 function generateQuestionnaire() {
     const container = document.getElementById('questions-container');
     container.innerHTML = appData.questionnaire.questions.map((q, i) => `
@@ -155,6 +150,7 @@ function generateQuestionnaire() {
             </div>
         </div>`).join('');
 }
+
 async function handleQuestionnaireSubmit(e) {
     e.preventDefault();
     if (!userId) return showToast("Database belum siap.", "error");
@@ -177,8 +173,8 @@ async function handleQuestionnaireSubmit(e) {
     const resultData = { patientName, patientRM, testType: currentTestType, score: totalScore, answers, createdAt: new Date().toISOString(), userId };
     
     try {
-        const docRef = doc(collection(db, 'artifacts', appId, 'users', userId, 'questionnaires'));
-        await setDoc(docRef, resultData);
+        // Use addDoc to let Firestore generate the ID
+        await addDoc(collection(db, 'artifacts', appId, 'users', userId, 'questionnaires'), resultData);
         showToast("Hasil kuesioner berhasil disimpan!", "success");
         displayResults(totalScore);
     } catch (err) {
@@ -186,6 +182,7 @@ async function handleQuestionnaireSubmit(e) {
         showToast("Gagal menyimpan hasil.", "error");
     }
 }
+
 function displayResults(score) {
     document.getElementById('questionnaire-form').classList.add('hidden');
     const resultsContainer = document.getElementById('results-container');
@@ -359,8 +356,7 @@ async function saveNewPatient() {
         userId
     };
     try {
-        const docRef = doc(collection(db, 'artifacts', appId, 'users', userId, 'patients'));
-        await setDoc(docRef, newPatient);
+        await addDoc(collection(db, 'artifacts', appId, 'users', userId, 'patients'), newPatient);
         showToast("Pasien baru ditambahkan.", "success");
         closePatientModal();
     } catch (error) { 
@@ -401,7 +397,8 @@ async function savePatientUpdate(e) {
 
 async function dischargePatient(patientId) {
     if(!userId) return showToast("User tidak terautentikasi", "error");
-    if (confirm("Apakah Anda yakin ingin menandai pasien ini sebagai 'Pulang'? Aksi ini tidak bisa dibatalkan.")) {
+    // Menggunakan dialog konfirmasi kustom sebagai ganti window.confirm
+    showConfirmationDialog("Apakah Anda yakin ingin menandai pasien ini sebagai 'Pulang'? Aksi ini tidak bisa dibatalkan.", async () => {
         try {
             const patientRef = doc(db, 'artifacts', appId, 'users', userId, 'patients', patientId);
             await updateDoc(patientRef, {
@@ -413,7 +410,7 @@ async function dischargePatient(patientId) {
             console.error("Error discharging patient:", error);
             showToast("Gagal mengarsipkan pasien.", "error");
         }
-    }
+    });
 }
 
 
@@ -448,3 +445,46 @@ function showToast(message, type = 'info') {
     toast.className = `toast show ${type}`;
     setTimeout(() => toast.classList.remove('show'), 3000);
 }
+
+// Fungsi untuk menampilkan dialog konfirmasi kustom
+function showConfirmationDialog(message, onConfirm) {
+    // Cek jika dialog sudah ada, hapus dulu
+    const existingDialog = document.getElementById('custom-confirm-dialog');
+    if (existingDialog) {
+        existingDialog.remove();
+    }
+
+    // Buat elemen dialog
+    const dialog = document.createElement('div');
+    dialog.id = 'custom-confirm-dialog';
+    dialog.className = 'modal-overlay';
+    dialog.innerHTML = `
+        <div class="modal-content" style="max-width: 400px;">
+            <div class="modal-header">
+                <h3>Konfirmasi Tindakan</h3>
+            </div>
+            <div class="modal-body" style="padding-bottom: 16px;">
+                <p>${message}</p>
+            </div>
+            <div class="modal-footer" style="gap: 8px;">
+                <button id="confirm-cancel" class="btn btn--secondary">Batal</button>
+                <button id="confirm-ok" class="btn btn--primary">Ya, Lanjutkan</button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(dialog);
+    dialog.classList.remove('hidden');
+
+    const closeDialog = () => {
+        dialog.classList.add('hidden');
+        setTimeout(() => dialog.remove(), 300); // Hapus setelah transisi selesai
+    };
+
+    document.getElementById('confirm-ok').onclick = () => {
+        onConfirm();
+        closeDialog();
+    };
+    document.getElementById('confirm-cancel').onclick = closeDialog;
+}
+

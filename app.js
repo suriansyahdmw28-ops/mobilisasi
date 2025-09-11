@@ -1,7 +1,7 @@
 // Import Firebase services
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-import { getFirestore, collection, addDoc, doc, onSnapshot, updateDoc, query, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+import { getFirestore, collection, addDoc, doc, onSnapshot, updateDoc, query, where, serverTimestamp, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
 // --- KONFIGURASI APLIKASI ---
 const appData = {
@@ -31,57 +31,53 @@ const appData = {
 };
 
 // --- INISIALISASI FIREBASE ---
-
-// 1. Deklarasikan variabel yang akan digunakan di luar fungsi
 let db, auth;
-let appId; // <-- Deklarasikan variabel appId di sini
+let userId, appId;
+let patientsData = [];
 
-// 2. Konfigurasi Firebase dari proyek Anda
-const firebaseConfig = {
-  apiKey: "AIzaSyDXLA7gDQcQtoOrgdW2PnTmYg8q7YQ0OLU",
-  authDomain: "mobilisasi-69979.firebaseapp.com",
-  projectId: "mobilisasi-69979",
-  storageBucket: "mobilisasi-69979.firebasestorage.app",
-  messagingSenderId: "97383306678",
-  appId: "1:97383306678:web:559cfabae7d7ba24631d17",
-  measurementId: "G-HQL9JQBMN3"
-};
-
-// 3. Fungsi untuk menginisialisasi Firebase
+// This function now correctly uses the global variables provided by the environment.
 async function initializeFirebase() {
     try {
-        // Inisialisasi aplikasi Firebase
+        // Use global variables if they exist, otherwise use fallbacks.
+        appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : { apiKey: "YOUR_FALLBACK_API_KEY", projectId: "YOUR_FALLBACK_PROJECT_ID" };
+        
         const app = initializeApp(firebaseConfig);
-
-        // !! PERBAIKAN: Tetapkan nilai appId dari konfigurasi
-        appId = firebaseConfig.appId;
-
-        // Inisialisasi layanan Firestore dan Auth
         db = getFirestore(app);
         auth = getAuth(app);
 
-        // Login secara anonim
-        await signInAnonymously(auth);
-        
-        console.log("Firebase berhasil diinisialisasi. User:", auth.currentUser?.uid);
-        
-        // Sekarang panggil fungsi yang membutuhkan Firebase
-        listenForPatientUpdates();
+        // Listen for authentication state changes.
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                // User is signed in.
+                userId = user.uid;
+                console.log("Firebase Authenticated. User ID:", userId);
+                listenForPatientUpdates(); // Start listening for data after authentication.
+            } else {
+                console.log("User not signed in.");
+            }
+        });
+
+        // Sign in using the provided token or anonymously.
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+            await signInWithCustomToken(auth, __initial_auth_token);
+        } else {
+            await signInAnonymously(auth);
+        }
 
     } catch (error) {
-        // Tangani error jika inisialisasi gagal
-        console.error("Gagal inisialisasi Firebase:", error);
-        showToast("Gagal terhubung ke database.", "error");
+        console.error("Firebase Initialization Error:", error);
+        showToast("Gagal terhubung ke database. Coba refresh halaman.", "error");
     }
 }
 
 // --- STATE APLIKASI & EVENT LISTENERS ---
-let patientsData = [];
 let currentTestType = 'pretest';
 
 document.addEventListener('DOMContentLoaded', () => {
     initializeFirebase();
     setupEventListeners();
+    populateNurseSelector();
     generateQuestionnaire();
     startRealtimeClocks();
 });
@@ -113,6 +109,10 @@ function setupEventListeners() {
             const patientId = e.target.closest('.update-patient-btn').dataset.id;
             openPatientModal(patientId);
         }
+        if (e.target.closest('.discharge-patient-btn')) {
+            const patientId = e.target.closest('.discharge-patient-btn').dataset.id;
+            dischargePatient(patientId);
+        }
         if (e.target.matches('.modal-close-btn') || e.target.matches('.modal-overlay')) {
             closePatientModal();
         }
@@ -125,7 +125,13 @@ function navigateToPage(pageId) {
     document.querySelectorAll('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.page === pageId));
 }
 
-// --- FUNGSI KUESIONER (DIKEMBALIKAN) ---
+// --- FUNGSI KUESIONER (Tidak berubah) ---
+function setActiveTest(testType) { /* ... */ }
+function generateQuestionnaire() { /* ... */ }
+async function handleQuestionnaireSubmit(e) { /* ... */ }
+function displayResults(score) { /* ... */ }
+function resetQuestionnaire() { /* ... */ }
+// Placeholder for unchanged questionnaire functions
 function setActiveTest(testType) {
     currentTestType = testType;
     document.querySelectorAll('.test-btn').forEach(btn => {
@@ -137,7 +143,6 @@ function setActiveTest(testType) {
     document.getElementById('test-mode-indicator').textContent = `Mode: ${testType === 'pretest' ? 'Pre-Test' : 'Post-Test'}`;
     resetQuestionnaire();
 }
-
 function generateQuestionnaire() {
     const container = document.getElementById('questions-container');
     container.innerHTML = appData.questionnaire.questions.map((q, i) => `
@@ -150,10 +155,9 @@ function generateQuestionnaire() {
             </div>
         </div>`).join('');
 }
-
 async function handleQuestionnaireSubmit(e) {
     e.preventDefault();
-    if (!auth.currentUser) return showToast("Database belum siap.", "error");
+    if (!userId) return showToast("Database belum siap.", "error");
     
     const patientName = document.getElementById('q-patient-name').value;
     const patientRM = document.getElementById('q-patient-rm').value;
@@ -170,10 +174,11 @@ async function handleQuestionnaireSubmit(e) {
         totalScore += appData.questionnaire.scoring[q.type][answer];
     }
     
-    const resultData = { patientName, patientRM, testType: currentTestType, score: totalScore, answers, createdAt: new Date().toISOString(), userId: auth.currentUser.uid };
-
+    const resultData = { patientName, patientRM, testType: currentTestType, score: totalScore, answers, createdAt: new Date().toISOString(), userId };
+    
     try {
-        await addDoc(collection(db, 'artifacts', appId, 'users', auth.currentUser.uid, 'questionnaires'), resultData);
+        const docRef = doc(collection(db, 'artifacts', appId, 'users', userId, 'questionnaires'));
+        await setDoc(docRef, resultData);
         showToast("Hasil kuesioner berhasil disimpan!", "success");
         displayResults(totalScore);
     } catch (err) {
@@ -181,7 +186,6 @@ async function handleQuestionnaireSubmit(e) {
         showToast("Gagal menyimpan hasil.", "error");
     }
 }
-
 function displayResults(score) {
     document.getElementById('questionnaire-form').classList.add('hidden');
     const resultsContainer = document.getElementById('results-container');
@@ -195,48 +199,105 @@ function displayResults(score) {
     interpEl.innerHTML = `<h4>${interp.text}</h4>`;
     interpEl.className = `interpretation ${interp.class}`;
 }
-
 function resetQuestionnaire() {
     document.getElementById('questionnaire-form').reset();
     document.getElementById('questionnaire-form').classList.remove('hidden');
     document.getElementById('results-container').classList.add('hidden');
 }
 
-// --- FUNGSI DASBOR PASIEN ---
+
+// --- FUNGSI DASBOR PASIEN (Diperbarui) ---
+
+function populateNurseSelector() {
+    const selector = document.getElementById('current-nurse-selector');
+    selector.innerHTML = appData.nurses.map(nurse => `<option value="${nurse}">${nurse}</option>`).join('');
+}
+
 function listenForPatientUpdates() {
-    if (!auth.currentUser) return setTimeout(listenForPatientUpdates, 500);
-    const q = query(collection(db, 'artifacts', appId, 'users', auth.currentUser.uid, 'patients'), orderBy("surgeryFinishTime", "desc"));
+    if (!userId) return; // Wait for user ID to be available
+    const q = query(collection(db, 'artifacts', appId, 'users', userId, 'patients'));
+    
     onSnapshot(q, snapshot => {
         patientsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        renderPatientTable(patientsData);
-    }, error => console.error("Error listening:", error));
+        
+        const activePatients = patientsData.filter(p => p.status === 'aktif').sort((a,b) => b.surgeryFinishTime.seconds - a.surgeryFinishTime.seconds);
+        const archivedPatients = patientsData.filter(p => p.status === 'diarsipkan').sort((a,b) => b.dischargedAt?.seconds - a.dischargedAt?.seconds);
+        
+        renderPatientTable(activePatients);
+        renderArchivedPatientTable(archivedPatients);
+
+    }, error => {
+        console.error("Error listening to patient updates:", error);
+        showToast("Gagal memuat data pasien.", "error");
+    });
 }
 
 function renderPatientTable(patients) {
     const tableBody = document.getElementById('patient-table-body');
     if (patients.length === 0) {
-        tableBody.innerHTML = `<tr class="no-data-row"><td colspan="6">Belum ada data pasien.</td></tr>`;
+        tableBody.innerHTML = `<tr class="no-data-row"><td colspan="8">Belum ada data pasien aktif.</td></tr>`;
         return;
     }
     tableBody.innerHTML = patients.map(p => {
-        const latestObs = p.observationLog?.[p.observationLog.length - 1] || { mobilityLevel: 0 };
+        const latestObs = p.observationLog?.[p.observationLog.length - 1] || { ponv: 'N/A', rass: 'N/A', mobilityLevel: 0 };
+        const idealMobility = calculateIdealMobility(p, latestObs);
+
         return `
             <tr>
-                <td>${p.name}</td>
-                <td>${p.rm}</td>
+                <td><strong>${p.name}</strong><br><small>${p.rm}</small></td>
                 <td>${p.operation}</td>
+                <td>${p.anesthesia}</td>
                 <td class="post-op-time" data-timestamp="${p.surgeryFinishTime.seconds}">${formatElapsedTime(p.surgeryFinishTime.seconds * 1000)}</td>
+                <td>${latestObs.ponv} / ${latestObs.rass}</td>
+                <td><span class="status status-level-${idealMobility.level}">${idealMobility.text}</span></td>
                 <td><span class="status status-level-${latestObs.mobilityLevel}">Level ${latestObs.mobilityLevel}</span></td>
-                <td><button class="btn btn--primary btn--sm update-patient-btn" data-id="${p.id}"><i class="fas fa-edit"></i> Update</button></td>
+                <td>
+                    <div class="action-buttons">
+                        <button class="btn btn--primary btn--sm update-patient-btn" data-id="${p.id}"><i class="fas fa-edit"></i> Update</button>
+                        <button class="btn btn--success btn--sm discharge-patient-btn" data-id="${p.id}"><i class="fas fa-check-circle"></i> Pulang</button>
+                    </div>
+                </td>
             </tr>`;
     }).join('');
+}
+
+function renderArchivedPatientTable(patients) {
+    const tableBody = document.getElementById('archived-patient-table-body');
+    if (patients.length === 0) {
+        tableBody.innerHTML = `<tr class="no-data-row"><td colspan="4">Belum ada pasien yang diarsipkan.</td></tr>`;
+        return;
+    }
+    tableBody.innerHTML = patients.map(p => `
+        <tr>
+            <td><strong>${p.name}</strong><br><small>${p.rm}</small></td>
+            <td>${p.operation}</td>
+            <td>${p.dischargedAt ? new Date(p.dischargedAt.seconds * 1000).toLocaleDateString('id-ID') : 'N/A'}</td>
+            <td><button class="btn btn--secondary btn--sm" disabled>Diarsipkan</button></td>
+        </tr>
+    `).join('');
+}
+
+function calculateIdealMobility(patient, latestObs) {
+    const hoursPostOp = (Date.now() - (patient.surgeryFinishTime.seconds * 1000)) / (3600 * 1000);
+    
+    // Basic logic, can be expanded
+    if (latestObs.ponv !== 'Tidak Ada' || latestObs.rass !== 'Sadar & Tenang') {
+        return { level: 1, text: "Level 1 (Atasi PONV/RASS)" };
+    }
+    if (patient.anesthesia === "General Anesthesia" && hoursPostOp < 6) return { level: 1, text: "Level 1 (Pasca GA)"};
+    if (hoursPostOp < 2) return { level: 0, text: "Level 0" };
+    if (hoursPostOp >= 2 && hoursPostOp < 6) return { level: 2, text: "Level 2" };
+    if (hoursPostOp >= 6 && hoursPostOp < 12) return { level: 3, text: "Level 3" };
+    if (hoursPostOp >= 12 && hoursPostOp < 24) return { level: 4, text: "Level 4" };
+    return { level: 5, text: "Level 5+" };
 }
 
 function openPatientModal(patientId = null) {
     const isEditing = patientId !== null;
     const patient = isEditing ? patientsData.find(p => p.id === patientId) : null;
-    document.getElementById('modal-title').textContent = isEditing ? 'Update Data Pasien' : 'Tambah Pasien Baru';
+    document.getElementById('modal-title').textContent = isEditing ? 'Update Observasi Pasien' : 'Tambah Pasien Baru';
     const modalBody = document.getElementById('modal-body');
+    
     const addForm = `
         <div class="modal-grid">
             <div class="form-group"><label>Nama Pasien</label><input type="text" id="patient-name" class="form-control" required></div>
@@ -246,6 +307,7 @@ function openPatientModal(patientId = null) {
             <div class="form-group full-width"><label>Operasi Selesai (Jam yang lalu)</label><input type="number" id="patient-hours-ago" class="form-control" placeholder="Contoh: 2" required></div>
         </div>
         <div class="modal-footer"><button class="btn btn--primary" id="save-new-patient-btn">Simpan Pasien</button></div>`;
+        
     const updateForm = `
         <h4>Pasien: ${patient?.name} (${patient?.rm})</h4><hr class="form-divider">
         <div class="modal-grid">
@@ -253,12 +315,24 @@ function openPatientModal(patientId = null) {
             <div class="form-group"><label>Skala Nyeri (0-10)</label><input type="number" id="update-pain" class="form-control" min="0" max="10" value="0"></div>
             <div class="form-group"><label>Mual/Muntah (PONV)</label><select id="update-ponv" class="form-control"><option>Tidak Ada</option><option>Ringan</option><option>Berat</option></select></div>
             <div class="form-group full-width"><label>Tingkat Kesadaran (RASS)</label><select id="update-rass" class="form-control"><option>Sadar & Tenang</option><option>Mengantuk</option><option>Sulit Dibangunkan</option></select></div>
-            <div class="form-group full-width"><label>Perawat</label><select id="update-nurse" class="form-control">${appData.nurses.map(n=>`<option>${n}</option>`).join('')}</select></div>
+            <div class="form-group full-width"><label>Catatan Tambahan</label><textarea id="update-notes" class="form-control" rows="2"></textarea></div>
         </div>
         <div class="modal-footer"><button class="btn btn--primary" id="save-update-btn" data-id="${patientId}">Simpan Observasi</button></div>`;
+        
     modalBody.innerHTML = isEditing ? updateForm : addForm;
-    if (isEditing) document.getElementById('save-update-btn').addEventListener('click', savePatientUpdate);
-    else document.getElementById('save-new-patient-btn').addEventListener('click', saveNewPatient);
+
+    if (isEditing) {
+        // Pre-fill latest data
+        const latestObs = patient.observationLog?.[patient.observationLog.length - 1] || {};
+        document.getElementById('update-mobility').value = latestObs.mobilityLevel || 0;
+        document.getElementById('update-pain').value = latestObs.painScale || 0;
+        document.getElementById('update-ponv').value = latestObs.ponv || 'Tidak Ada';
+        document.getElementById('update-rass').value = latestObs.rass || 'Sadar & Tenang';
+        document.getElementById('save-update-btn').addEventListener('click', savePatientUpdate);
+    } else {
+        document.getElementById('save-new-patient-btn').addEventListener('click', saveNewPatient);
+    }
+    
     document.getElementById('patient-modal').classList.remove('hidden');
 }
 
@@ -267,59 +341,103 @@ function closePatientModal() {
 }
 
 async function saveNewPatient() {
+    if(!userId) return showToast("User tidak terautentikasi", "error");
     const name = document.getElementById('patient-name').value;
     const rm = document.getElementById('patient-rm').value;
     const hoursAgo = parseFloat(document.getElementById('patient-hours-ago').value);
+    
     if (!name || !rm || isNaN(hoursAgo)) return showToast("Harap lengkapi semua field.", "error");
+    
     const newPatient = {
         name, rm, 
         operation: document.getElementById('patient-operation').value,
         anesthesia: document.getElementById('patient-anesthesia').value,
         surgeryFinishTime: new Date(Date.now() - hoursAgo * 3600 * 1000),
         createdAt: serverTimestamp(),
-        observationLog: []
+        observationLog: [],
+        status: 'aktif', // Status default
+        userId
     };
     try {
-        await addDoc(collection(db, 'artifacts', appId, 'users', auth.currentUser.uid, 'patients'), newPatient);
+        const docRef = doc(collection(db, 'artifacts', appId, 'users', userId, 'patients'));
+        await setDoc(docRef, newPatient);
         showToast("Pasien baru ditambahkan.", "success");
         closePatientModal();
-    } catch (error) { showToast("Gagal menambahkan pasien.", "error"); }
+    } catch (error) { 
+        console.error("Error adding patient:", error);
+        showToast("Gagal menambahkan pasien.", "error"); 
+    }
 }
 
 async function savePatientUpdate(e) {
+    if(!userId) return showToast("User tidak terautentikasi", "error");
     const patientId = e.target.dataset.id;
     const patient = patientsData.find(p => p.id === patientId);
+    const selectedNurse = document.getElementById('current-nurse-selector').value;
+    
+    if(!selectedNurse) return showToast("Pilih nama perawat terlebih dahulu.", "warning");
+
     const newObservation = {
         mobilityLevel: parseInt(document.getElementById('update-mobility').value),
         painScale: document.getElementById('update-pain').value,
         ponv: document.getElementById('update-ponv').value,
         rass: document.getElementById('update-rass').value,
-        nurse: document.getElementById('update-nurse').value,
+        notes: document.getElementById('update-notes').value,
+        nurse: selectedNurse,
         timestamp: new Date()
     };
     try {
-        await updateDoc(doc(db, 'artifacts', appId, 'users', auth.currentUser.uid, 'patients', patientId), {
+        const patientRef = doc(db, 'artifacts', appId, 'users', userId, 'patients', patientId);
+        await updateDoc(patientRef, {
             observationLog: [...(patient.observationLog || []), newObservation]
         });
         showToast("Observasi berhasil diperbarui.", "success");
         closePatientModal();
-    } catch (error) { showToast("Gagal memperbarui data.", "error"); }
+    } catch (error) { 
+        console.error("Error updating patient:", error);
+        showToast("Gagal memperbarui data.", "error"); 
+    }
 }
+
+async function dischargePatient(patientId) {
+    if(!userId) return showToast("User tidak terautentikasi", "error");
+    if (confirm("Apakah Anda yakin ingin menandai pasien ini sebagai 'Pulang'? Aksi ini tidak bisa dibatalkan.")) {
+        try {
+            const patientRef = doc(db, 'artifacts', appId, 'users', userId, 'patients', patientId);
+            await updateDoc(patientRef, {
+                status: 'diarsipkan',
+                dischargedAt: serverTimestamp()
+            });
+            showToast("Pasien telah diarsipkan.", "success");
+        } catch (error) {
+            console.error("Error discharging patient:", error);
+            showToast("Gagal mengarsipkan pasien.", "error");
+        }
+    }
+}
+
 
 // --- FUNGSI BANTUAN ---
 function startRealtimeClocks() {
     setInterval(() => {
         document.querySelectorAll('.post-op-time').forEach(el => {
-            el.textContent = formatElapsedTime(parseInt(el.dataset.timestamp) * 1000);
+            const timestamp = parseInt(el.dataset.timestamp, 10);
+            if (!isNaN(timestamp)) {
+               el.textContent = formatElapsedTime(timestamp * 1000);
+            }
         });
-    }, 60000);
+    }, 60000); // Update every minute
 }
 
 function formatElapsedTime(timestamp) {
     const seconds = Math.floor((new Date() - timestamp) / 1000);
-    const hours = Math.floor(seconds / 3600);
+    const days = Math.floor(seconds / 86400);
+    const hours = Math.floor((seconds % 86400) / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
-    return hours > 0 ? `${hours} jam ${minutes} mnt` : `${minutes} mnt`;
+
+    if (days > 0) return `${days} hari ${hours} jam`;
+    if (hours > 0) return `${hours} jam ${minutes} mnt`;
+    return `${minutes} mnt`;
 }
 
 function showToast(message, type = 'info') {
@@ -330,4 +448,3 @@ function showToast(message, type = 'info') {
     toast.className = `toast show ${type}`;
     setTimeout(() => toast.classList.remove('show'), 3000);
 }
-

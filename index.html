@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="id">
 <head>
@@ -46,10 +47,10 @@
                     </div>
                 </div>
                 <div class="menu-grid">
-                    <div class="menu-card" data-page="leaflet"><div class="menu-icon"><i class="fas fa-book-open"></i></div><h4>Leaflet Digital</h4><p>Panduan lengkap protokol mobilisasi dini.</p><button class="btn btn--primary btn--sm">Buka Leaflet</button></div>
+                    <div class="menu-card" data-page="leaflet"><div class="menu-icon"><i class="fas fa-book-open"></i></div><h4>Leaflet Digital</h4><p>Panduan lengkap prosedur mobilisasi dini.</p><button class="btn btn--primary btn--sm">Buka Leaflet</button></div>
                     <div class="menu-card" data-page="video"><div class="menu-icon"><i class="fas fa-play-circle"></i></div><h4>Video Edukasi</h4><p>Demonstrasi visual teknik mobilisasi.</p><button class="btn btn--primary btn--sm">Tonton Video</button></div>
-                    <div class="menu-card" data-page="questionnaire"><div class="menu-icon"><i class="fas fa-clipboard-question"></i></div><h4>Kuesioner</h4><p>Lakukan Pre-test dan Post-test pemahaman.</p><button class="btn btn--primary btn--sm">Mulai Kuesioner</button></div>
-                    <div class="menu-card" data-page="observation"><div class="menu-icon"><i class="fas fa-tasks"></i></div><h4>Dasbor Pasien</h4><p>Monitor kemajuan mobilisasi pasien secara real-time.</p><button class="btn btn--primary btn--sm">Buka Dasbor</button></div>
+                    <div class="menu-card" data-page="questionnaire"><div class="menu-icon"><i class="fas fa-clipboard-question"></i></div><h4>Kuesioner</h4><p>Pre-test dan Post-test untuk pasien.</p><button class="btn btn--primary btn--sm">Mulai Kuesioner</button></div>
+                    <div class="menu-card" data-page="observation"><div class="menu-icon"><i class="fas fa-tasks"></i></div><h4>Dasbor Observasi Pasien</h4><p>Monitor kemajuan mobilisasi pasien secara real-time.</p><button class="btn btn--primary btn--sm">Buka Dasbor</button></div>
                 </div>
             </div>
             <div id="leaflet-page" class="page"><div class="page-header"><h2>Leaflet Digital - Mobilisasi Dini</h2><a href="leaflet.pdf" download="Leaflet-Mobilisasi-Dini.pdf" class="btn btn--primary btn--sm"><i class="fas fa-download"></i> Download PDF</a></div><div class="leaflet-content"><div class="pdf-viewer-container"><iframe src="leaflet.pdf"></iframe></div></div></div>
@@ -102,7 +103,7 @@
             <!-- Observation Page -->
             <div id="observation-page" class="page">
                 <div class="page-header">
-                    <h2>Dasbor Pasien Pasca-Operasi</h2>
+                    <h2>Dasbor Pasien Post-Operasi</h2>
                     <button class="btn btn--primary" id="add-patient-btn">
                         <i class="fas fa-user-plus"></i> Tambah Pasien Baru
                     </button>
@@ -111,7 +112,7 @@
                 <!-- Penjelasan dan Kontrol Perawat -->
                  <div class="dashboard-controls">
                     <div class="nurse-selector form-group">
-                        <label for="current-nurse-selector" class="form-label">Nama Perawat Pencatat:</label>
+                        <label for="current-nurse-selector" class="form-label">Nama Perawat:</label>
                         <select id="current-nurse-selector" class="form-control">
                             <!-- Opsi perawat akan ditambahkan oleh JavaScript -->
                         </select>
@@ -119,7 +120,7 @@
                 </div>
                 
                 <div class="info-card">
-                    <h4><i class="fas fa-walking"></i> Panduan Skala Mobilisasi</h4>
+                    <h4><i class="fas fa-walking"></i> Panduan Level Mobilisasi</h4>
                     <div id="mobility-scale-info" class="mobility-scale-grid">
                         <!-- Konten diisi oleh JavaScript -->
                     </div>
@@ -208,3 +209,4 @@
     <script type="module" src="app.js"></script>
 </body>
 </html>
+

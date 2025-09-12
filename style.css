@@ -257,3 +257,8 @@ p:last-child { margin-bottom: 0; }
   object-fit: contain;
 }
 
+.hero-logo {
+  max-width: 120px; /* Atur lebar maksimal logo, sesuaikan jika perlu */
+  height: auto;     /* Tinggi akan menyesuaikan secara otomatis */
+  margin-top: var(--space-24); /* Memberi jarak dari teks di atasnya */
+}

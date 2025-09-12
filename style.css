@@ -249,3 +249,11 @@ p:last-child { margin-bottom: 0; }
   .page-header { flex-direction: column; align-items: stretch; }
   .page-header button { width: 100%; }
 }
+
+/* Tambahkan ini di akhir file style.css */
+.logo-image {
+  height: 48px; /* Atur tinggi logo sesuai keinginan */
+  width: auto;  /* Lebar akan menyesuaikan secara otomatis */
+  object-fit: contain;
+}
+

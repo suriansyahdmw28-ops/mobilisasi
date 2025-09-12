@@ -9,14 +9,15 @@ import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gsta
 
 // --- KONFIGURASI APLIKASI ---
 const appData = {
-    nurses: ["Suriansyah, S.Kep., Ns", "Ahmad, S.Kep., Ns", "Budiman, A.Md.Kep", "Citra, S.Kep., Ns", "Dewi, A.Md.Kep"],
-    operations: ["Appendectomy", "Hernia Repair", "Laparotomy", "Mastectomy", "Cholecystectomy", "Sectio Caesarea"],
+    nurses: ["Suriansyah, S.Kep., Ns", "Akbar Wirahadi, A.Md.Kep", "Annisa Aulia Rahma, A.Md.Kep", "Dina Ghufriana, S.Kep.Ners", "Dwi Sucilowati, AMK", "Gusti Rusmiyati, S.Kep.Ners", "Gusti Rusmiyati, S.Kep.Ners", "Herliyana Paramitha, S.Kep.,Ners", "Isnawati, AMK", "Khairun Nisa, S.Kep.Ners", "Noor Makiah, AMK", "Nurmilah A, A.Md.Kep", "Qatrunnada Mufidah, A.Md.Kep", "Raudatul Hikmah, S.Kep., Ns", "Verawaty, AMK", "Zahratul Zannah, S.Kep., Ns"],
+    // PERUBAHAN: Menambahkan opsi "Lainnya..."
+    operations: ["Appendectomy", "Hernia Repair", "Laparotomy", "Mastectomy", "BPH", "Excision", "Debridement", "ORIF", "ROI", "Lainnya..."],
     anesthesiaTypes: ["General Anesthesia", "Spinal Anesthesia", "Epidural Anesthesia", "Regional Block"],
     mobilityScale: [
-        {level: 0, name: "Level 0: Tirah Baring", description: "Pasien pasif, semua gerakan dibantu perawat."},
-        {level: 1, name: "Level 1: Latihan Pasif/Aktif di Tempat Tidur", description: "Miring kanan-kiri, latihan rentang gerak."},
-        {level: 2, name: "Level 2: Duduk di Tepi Tempat Tidur", description: "Mulai mendudukkan pasien di sisi tempat tidur."},
-        {level: 3, name: "Level 3: Berdiri di Samping Tempat Tidur", description: "Latihan berdiri dengan bantuan."},
+        {level: 0, name: "Level 0: Tirah Baring", description: "Pasien pasif, hanya berbaring."},
+        {level: 1, name: "Level 1: Latihan Pasif/Aktif di Tempat Tidur", description: "Latihan nafas dalam, Batuk Efektif, Miring kanan-kiri, latihan rentang gerak."},
+        {level: 2, name: "Level 2: Duduk di Tepi Tempat Tidur", description: "Pasien duduk ditepi tempat tidur dengan kedua kaki menggantung."},
+        {level: 3, name: "Level 3: Berdiri di Samping Tempat Tidur", description: "Latihan berdiri sendiri/dengan bantuan."},
         {level: 4, name: "Level 4: Berjalan Beberapa Langkah", description: "Mulai berjalan di sekitar tempat tidur."},
         {level: 5, name: "Level 5: Berjalan di Koridor", description: "Berjalan lebih jauh di area ruangan/koridor."},
         {level: 6, name: "Level 6: Mandiri", description: "Pasien mampu beraktivitas secara mandiri."}
@@ -193,12 +194,25 @@ function listenForPatientUpdates() {
 
 async function saveNewPatient() {
     if(!userId || !clinicId) return showToast("Koneksi ke database belum siap.", "error");
-    // ... (logika pengambilan data form tetap sama)
+    
     const name = document.getElementById('patient-name').value;
     const rm = document.getElementById('patient-rm').value;
     const finishTimeValue = document.getElementById('patient-finish-time').value;
     const selectedNurse = document.getElementById('current-nurse-selector').value;
     
+    // --- PERUBAHAN: Logika untuk mendapatkan nilai operasi ---
+    const operationSelect = document.getElementById('patient-operation');
+    let operationValue = operationSelect.value;
+
+    if (operationValue === 'Lainnya...') {
+        const otherOperationText = document.getElementById('other-operation-text').value.trim();
+        if (!otherOperationText) {
+            return showToast("Harap sebutkan jenis operasi lainnya.", "warning");
+        }
+        operationValue = otherOperationText;
+    }
+    // --- AKHIR PERUBAHAN ---
+
     if (!name || !rm || !finishTimeValue) return showToast("Harap lengkapi data pasien.", "error");
     if (!selectedNurse) return showToast("Pilih nama perawat terlebih dahulu.", "warning");
 
@@ -213,22 +227,19 @@ async function saveNewPatient() {
     
     const newPatient = {
         name, rm, 
-        operation: document.getElementById('patient-operation').value,
+        operation: operationValue, // Menggunakan nilai yang sudah diproses
         anesthesia: document.getElementById('patient-anesthesia').value,
         surgeryFinishTime: new Date(finishTimeValue),
         createdAt: serverTimestamp(),
         status: 'aktif',
-        clinicId: clinicId, // Menyimpan ID klinik bersama data
-        createdBy: userId, // Menyimpan ID anonim untuk audit
+        clinicId: clinicId,
+        createdBy: userId,
     };
 
     try {
-        // PERUBAHAN: Menggunakan clinicId di path
         const collectionPath = `clinics/${clinicId}/patients`;
         const patientRef = await addDoc(collection(db, collectionPath), newPatient);
-
         await addObservationToPatient(patientRef.id, initialObservation);
-
         showToast("Pasien baru ditambahkan.", "success");
         closePatientModal();
     } catch (error) { 
@@ -240,7 +251,6 @@ async function saveNewPatient() {
 async function savePatientUpdate(e) {
     if(!userId || !clinicId) return showToast("Koneksi ke database belum siap.", "error");
     const patientId = e.target.dataset.id;
-    // ... (logika lainnya tetap sama)
     const selectedNurse = document.getElementById('current-nurse-selector').value;
     if(!selectedNurse) return showToast("Pilih nama perawat terlebih dahulu.", "warning");
     const newObservation = {
@@ -250,7 +260,7 @@ async function savePatientUpdate(e) {
         rass: document.getElementById('update-rass').value,
         notes: document.getElementById('update-notes').value,
         nurse: selectedNurse,
-        updatedBy: userId // Menambahkan info siapa yang mengupdate
+        updatedBy: userId
     };
     try {
         await addObservationToPatient(patientId, newObservation);
@@ -266,7 +276,6 @@ async function dischargePatient(patientId) {
     if(!userId || !clinicId) return showToast("Koneksi ke database belum siap.", "error");
     showConfirmationDialog("Apakah Anda yakin ingin menandai pasien ini sebagai 'Pulang'? Aksi ini tidak bisa dibatalkan.", async () => {
         try {
-            // PERUBAHAN: Menggunakan clinicId di path
             const docPath = `clinics/${clinicId}/patients/${patientId}`;
             const patientRef = doc(db, docPath);
             await updateDoc(patientRef, {
@@ -280,10 +289,6 @@ async function dischargePatient(patientId) {
         }
     });
 }
-
-
-// --- TIDAK ADA PERUBAHAN PADA FUNGSI-FUNGSI DI BAWAH INI ---
-// (Semua fungsi lain seperti renderPatientTable, openPatientModal, dll., tetap sama)
 
 function getSecondsFromTS(ts) {
     if (!ts) return 0;
@@ -497,11 +502,16 @@ function openPatientModal(patientId = null) {
     document.getElementById('modal-title').textContent = isEditing ? 'Update Observasi Pasien' : 'Tambah Pasien Baru';
     const modalBody = document.getElementById('modal-body');
     
+    // PERUBAHAN: Menambahkan container dan input untuk operasi "Lainnya..."
     const addForm = `
         <div class="modal-grid">
             <div class="form-group"><label for="patient-name">Nama Pasien</label><input type="text" id="patient-name" class="form-control" required></div>
             <div class="form-group"><label for="patient-rm">Nomor RM</label><input type="text" id="patient-rm" class="form-control" required></div>
             <div class="form-group full-width"><label for="patient-operation">Jenis Operasi</label><select id="patient-operation" class="form-control">${appData.operations.map(op=>`<option>${op}</option>`).join('')}</select></div>
+            <div class="form-group full-width" id="other-operation-container" style="display: none;">
+                <label for="other-operation-text">Sebutkan Jenis Operasi</label>
+                <input type="text" id="other-operation-text" class="form-control" placeholder="Contoh: Cholecystectomy">
+            </div>
             <div class="form-group full-width"><label for="patient-anesthesia">Jenis Anestesi</label><select id="patient-anesthesia" class="form-control">${appData.anesthesiaTypes.map(an=>`<option>${an}</option>`).join('')}</select></div>
             <div class="form-group full-width"><label for="patient-finish-time">Waktu Selesai Operasi</label><input type="datetime-local" id="patient-finish-time" class="form-control" required></div>
         </div>
@@ -539,6 +549,18 @@ function openPatientModal(patientId = null) {
         now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
         document.getElementById('patient-finish-time').value = now.toISOString().slice(0, 16);
         document.getElementById('save-new-patient-btn').addEventListener('click', saveNewPatient);
+        
+        // --- PERUBAHAN: Menambahkan event listener untuk menampilkan/menyembunyikan input ---
+        const operationSelect = document.getElementById('patient-operation');
+        const otherOperationContainer = document.getElementById('other-operation-container');
+        operationSelect.addEventListener('change', function() {
+            if (this.value === 'Lainnya...') {
+                otherOperationContainer.style.display = 'block';
+            } else {
+                otherOperationContainer.style.display = 'none';
+            }
+        });
+        // --- AKHIR PERUBAHAN ---
     }
     
     document.getElementById('patient-modal').classList.remove('hidden');
@@ -607,4 +629,3 @@ function showConfirmationDialog(message, onConfirm) {
     };
     document.getElementById('confirm-cancel').onclick = closeDialog;
 }
-

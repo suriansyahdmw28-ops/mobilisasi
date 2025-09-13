@@ -1,4 +1,4 @@
-// app.js — MODIFIED with a new dedicated Analysis Page
+// app.js — MODIFIED with Advanced Logic Engine and Revamped Analysis Dashboard
 
 // Import Firebase services
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
@@ -45,10 +45,8 @@ const appData = {
 // --- INISIALISASI ---
 let db, auth;
 let userId, clinicId;
-// PERUBAHAN: Memisahkan data untuk dasbor dan untuk analisis
 let allPatientsData = [];
 let questionnaireData = [];
-// Variabel untuk menyimpan instance chart agar bisa di-destroy
 let chartInstances = {};
 
 
@@ -109,7 +107,6 @@ async function initializeFirebase() {
             if (user) {
                 userId = user.uid;
                 console.log("Firebase Authenticated. User ID:", userId, "| Clinic ID:", clinicId);
-                // PERUBAHAN: Memanggil listener untuk kedua koleksi data
                 listenForPatientUpdates(); 
                 listenForQuestionnaireUpdates();
             } else {
@@ -174,10 +171,8 @@ function listenForPatientUpdates() {
     if (tableBody) tableBody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding: 20px;"><i class="fas fa-spinner fa-spin"></i> Memuat data pasien...</td></tr>`;
     
     onSnapshot(q, snapshot => {
-        // PERUBAHAN: Menyimpan semua data pasien ke variabel global
         allPatientsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         
-        // Hanya render pasien aktif di tabel dasbor utama
         const activePatients = allPatientsData.filter(p => p.status === 'aktif' && p.surgeryFinishTime);
         renderPatientTable(activePatients.sort((a,b) => getSecondsFromTS(b.surgeryFinishTime) - getSecondsFromTS(a.surgeryFinishTime)));
 
@@ -188,7 +183,6 @@ function listenForPatientUpdates() {
     });
 }
 
-// PERUBAHAN: Fungsi baru untuk mengambil data kuesioner
 function listenForQuestionnaireUpdates() {
     if (!userId || !clinicId) return;
     const collectionPath = `clinics/${clinicId}/questionnaires`;
@@ -251,7 +245,7 @@ async function savePatientUpdate(e) {
     if(!selectedNurse) return showToast("Pilih nama perawat terlebih dahulu.", "warning");
     const newObservation = {
         mobilityLevel: parseInt(document.getElementById('update-mobility').value),
-        painScale: document.getElementById('update-pain').value,
+        painScale: parseInt(document.getElementById('update-pain').value), // Pastikan painScale juga diupdate
         ponv: document.getElementById('update-ponv').value,
         rass: document.getElementById('update-rass').value,
         notes: document.getElementById('update-notes').value,
@@ -377,7 +371,6 @@ function navigateToPage(pageId) {
     if(page) page.classList.add('active');
     document.querySelectorAll('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.page === pageId));
 
-    // PERUBAHAN: Trigger render analisis jika halaman analisis yang dibuka
     if (pageId === 'analysis') {
         renderGlobalAnalysis();
     }
@@ -454,9 +447,9 @@ function renderPatientTable(patients) {
         return;
     }
     tableBody.innerHTML = patients.map(p => {
-        const latestObs = p.latestObservation || { ponv: 'N/A', rass: 'N/A', mobilityLevel: 1, createdAt: { seconds: getSecondsFromTS(p.createdAt) } };
-        const idealMobility = calculateIdealMobility(p, latestObs);
-        const suggestion = generateActionSuggestion(latestObs, idealMobility);
+        // PERUBAHAN: Menggunakan logic engine baru
+        const plan = getMobilizationPlan(p);
+        const latestObs = p.latestObservation || { ponv: 'N/A', rass: 'N/A', mobilityLevel: 1 };
         const finishSeconds = getSecondsFromTS(p.surgeryFinishTime);
         return `
             <tr>
@@ -466,9 +459,9 @@ function renderPatientTable(patients) {
                 <td class="post-op-time" data-timestamp="${finishSeconds}">${formatElapsedTime(finishSeconds * 1000)}</td>
                 <td>${latestObs.ponv} / ${latestObs.rass}</td>
                 <td><span class="status status-level-${latestObs.mobilityLevel}">Level ${latestObs.mobilityLevel}</span></td>
-                <td><span class="status status-level-${idealMobility.level}">${idealMobility.text}</span></td>
+                <td><span class="status status-level-${plan.targetLevel}" title="${plan.reason}">${plan.targetText}</span></td>
                 <td>
-                    <div class="suggestion-text">${suggestion}</div>
+                    <div class="suggestion-text">${plan.suggestion}</div>
                     <div class="action-buttons">
                         <button class="btn btn--primary btn--sm update-patient-btn" data-id="${p.id}"><i class="fas fa-edit"></i> Update</button>
                         <button class="btn btn--success btn--sm discharge-patient-btn" data-id="${p.id}"><i class="fas fa-check-circle"></i> Pulang</button>
@@ -479,58 +472,77 @@ function renderPatientTable(patients) {
     }).join('');
 }
 
-function calculateIdealMobility(patient, latestObs) {
+// --- PERUBAHAN BESAR: MOBILIZATION LOGIC ENGINE ---
+function getMobilizationPlan(patient) {
+    const latestObs = patient.latestObservation || { mobilityLevel: 1, ponv: 'Tidak Ada', rass: 'Sadar & Tenang', painScale: 0 };
     const hoursPostOp = (Date.now() - (getSecondsFromTS(patient.surgeryFinishTime) * 1000)) / (3600 * 1000);
-    const majorOperations = ["Laparotomy", "ORIF"];
-    const isMajorOp = majorOperations.includes(patient.operation);
-    
-    if (latestObs.ponv !== 'Tidak Ada' || latestObs.rass !== 'Sadar & Tenang') {
-        return { level: 1, text: `Level 1 (Atasi ${latestObs.ponv !== 'Tidak Ada' ? 'PONV' : 'RASS'})` };
-    }
-    
-    if (patient.anesthesia === "Spinal Anesthesia" && hoursPostOp < 8) {
-        return { level: 2, text: "Level 2 (Post-Spinal)" };
-    }
-    
-    if (isMajorOp) {
-        if (hoursPostOp < 6) return { level: 1, text: "Level 1" };
-        if (hoursPostOp >= 6 && hoursPostOp < 12) return { level: 2, text: "Level 2" };
-        if (hoursPostOp >= 12 && hoursPostOp < 24) return { level: 3, text: "Level 3" };
-        if (hoursPostOp >= 24 && hoursPostOp < 48) return { level: 5, text: "Level 5" };
-        if (hoursPostOp >= 48 && hoursPostOp < 72) return { level: 6, text: "Level 6" };
-        return { level: 7, text: "Level 7" };
-    } else {
-        if (hoursPostOp < 4) return { level: 2, text: "Level 2" };
-        if (hoursPostOp >= 4 && hoursPostOp < 8) return { level: 3, text: "Level 3" };
-        if (hoursPostOp >= 8 && hoursPostOp < 18) return { level: 5, text: "Level 5" };
-        if (hoursPostOp >= 18 && hoursPostOp < 36) return { level: 6, text: "Level 6" };
-        return { level: 7, text: "Level 7" };
-    }
-}
-
-function generateActionSuggestion(latestObs, idealMobility) {
+    const pod = Math.floor(hoursPostOp / 24); // Post-Operative Day
     const currentLevel = latestObs.mobilityLevel;
-    const idealLevel = idealMobility.level;
-    
-    if (latestObs.ponv !== 'Tidak Ada') return '<strong>Prioritas:</strong> Atasi mual/muntah (PONV) sesuai advise DPJP.';
-    if (latestObs.rass !== 'Sadar & Tenang') return '<strong>Prioritas:</strong> Stabilkan kesadaran (RASS). Observasi ketat.';
-    
-    if (currentLevel >= idealLevel) {
-        const nextLevel = appData.mobilityScale.find(s => s.level === currentLevel + 1);
-        if (nextLevel) {
-            return `<strong>Pertahankan!</strong> Target tercapai. Dorong ke <strong>${nextLevel.name}</strong> jika kondisi memungkinkan.`;
-        }
-        return '<strong>Luar Biasa!</strong> Pasien sangat aktif. Pertahankan dan monitor kenyamanan.';
-    } else {
-        const targetAction = appData.mobilityScale.find(s => s.level === idealLevel);
-        const currentAction = appData.mobilityScale.find(s => s.level === currentLevel);
-        
-        const currentActionName = currentAction ? currentAction.name : 'Level Saat Ini';
-        const targetActionName = targetAction ? targetAction.name : 'Target Berikutnya';
 
-        return `<strong>Ayo Kejar!</strong> Pasien masih di <strong>${currentActionName}</strong>. Target selanjutnya: <strong>${targetActionName}</strong>.`;
+    let targetLevel = 1;
+    let reason = "Target dasar untuk POD " + pod;
+    let suggestions = [];
+
+    // Step 1: Determine Base Target by POD
+    if (pod === 0) { // < 24 jam
+        targetLevel = (hoursPostOp < 8) ? 2 : 3;
+        reason = `Target POD 0 (${hoursPostOp.toFixed(0)} jam post-op)`;
+    } else if (pod === 1) { // 24-48 jam
+        targetLevel = 4;
+        reason = "Target POD 1";
+    } else if (pod === 2) { // 48-72 jam
+        targetLevel = 5;
+        reason = "Target POD 2";
+    } else { // > 72 jam
+        targetLevel = 6;
+        reason = "Target POD 3+";
     }
+
+    // Step 2: Apply Adjustments based on Operation & Anesthesia
+    const isMajorOp = ["Laparotomy", "ORIF"].includes(patient.operation);
+    if (isMajorOp && pod < 2) {
+        targetLevel = Math.max(1, targetLevel - 1);
+        reason += ", disesuaikan untuk op. mayor";
+    }
+
+    const isSpinal = ["Spinal Anesthesia", "Epidural Anesthesia"].includes(patient.anesthesia);
+    if (isSpinal && hoursPostOp < 8) {
+        targetLevel = Math.min(targetLevel, 2);
+        reason = "Target dibatasi (efek anestesi spinal < 8 jam)";
+        suggestions.push("<strong>Aksi:</strong> Pastikan kekuatan motorik & sensorik tungkai bawah pulih sepenuhnya sebelum mencoba berdiri untuk mencegah risiko jatuh.");
+    }
+    
+    // Step 3: Check for Overriding Barriers
+    if (latestObs.ponv !== 'Tidak Ada') {
+        suggestions.unshift("<strong>Prioritas:</strong> Atasi mual/muntah (PONV). Kolaborasi dengan DPJP untuk antiemetik yang efektif.");
+    }
+    if (latestObs.rass !== 'Sadar & Tenang') {
+        suggestions.unshift("<strong>Prioritas:</strong> Stabilkan kesadaran (RASS). Lakukan observasi ketat pada tanda-tanda vital.");
+    }
+    if (latestObs.painScale > 6) {
+        suggestions.push("<strong>Saran:</strong> Berikan manajemen nyeri yang adekuat sebelum mobilisasi. Anjurkan teknik relaksasi napas dalam.");
+    }
+    
+    // Step 4: Generate Final Suggestion Text
+    const isTargetAchieved = currentLevel >= targetLevel;
+    const targetLevelInfo = appData.mobilityScale.find(l => l.level === targetLevel);
+    
+    if (isTargetAchieved) {
+        const nextLevelInfo = appData.mobilityScale.find(l => l.level === currentLevel + 1);
+        suggestions.unshift(`<strong>Luar Biasa!</strong> Target tercapai. Pertahankan level saat ini dan dorong ke <strong>${nextLevelInfo ? nextLevelInfo.name : 'level berikutnya'}</strong> jika kondisi pasien stabil.`);
+    } else {
+        suggestions.unshift(`<strong>Ayo Kejar!</strong> Pasien belum mencapai target <strong>${targetLevelInfo.name}</strong>. Fokus pada intervensi untuk mencapai target tersebut.`);
+    }
+
+    return {
+        targetLevel: targetLevel,
+        targetText: `Level ${targetLevel}`,
+        reason: reason,
+        isTargetAchieved: isTargetAchieved,
+        suggestion: suggestions.join('<br>')
+    };
 }
+
 
 function openPatientModal(patientId = null) {
     const isEditing = patientId !== null;
@@ -647,105 +659,125 @@ function renderQuestionnaireAnalysis(data) {
                 </div>
             </div>
         </div>
-        <div class="chart-container" style="margin-top: 24px;">
-            <h4>Perbandingan Skor Rata-rata Pre vs. Post Test</h4>
-            <canvas id="q-comparison-chart"></canvas>
-        </div>
         <div class="interpretation-card">
             <h4>Interpretasi</h4>
-            <p>Data menunjukkan adanya <strong>peningkatan pemahaman pasien sebesar ${improvement.toFixed(0)}%</strong> setelah mendapatkan edukasi melalui leaflet dan video. Skor rata-rata yang lebih tinggi pada post-test mengindikasikan bahwa intervensi yang diberikan efektif dalam meningkatkan pengetahuan pasien mengenai pentingnya mobilisasi dini.</p>
+            <p>Data menunjukkan adanya <strong>peningkatan pemahaman pasien sebesar ${improvement.toFixed(0)}%</strong> setelah mendapatkan edukasi. Skor rata-rata yang lebih tinggi pada post-test mengindikasikan bahwa intervensi efektif.</p>
         </div>
     `;
-
-    const chartData = {
-        labels: ['Pre-Test', 'Post-Test'],
-        datasets: [{
-            label: 'Skor Rata-rata',
-            data: [avgPreScore, avgPostScore],
-            backgroundColor: ['rgba(230, 129, 97, 0.7)', 'rgba(41, 150, 161, 0.7)'],
-            borderColor: ['rgba(230, 129, 97, 1)', 'rgba(41, 150, 161, 1)'],
-            borderWidth: 1
-        }]
-    };
-    renderChart('q-comparison-chart', 'bar', chartData, { scales: { y: { beginAtZero: true, max: 20 } } });
 }
 
+// PERUBAHAN: Fungsi Analisis Dasbor yang Sepenuhnya Baru
 function renderPatientDashboardAnalysis(data) {
     const container = document.getElementById('patient-analysis-container');
-    const dischargedPatients = data.filter(p => p.status === 'diarsipkan' && p.dischargedAt && p.surgeryFinishTime);
-
-    if (dischargedPatients.length === 0) {
-        container.innerHTML = `<div class="info-card"><p>Belum ada data pasien pulang yang cukup untuk dianalisis.</p></div>`;
+    if (data.length === 0) {
+        container.innerHTML = `<div class="info-card"><p>Belum ada data pasien untuk dianalisis.</p></div>`;
         return;
     }
 
-    // 1. Rata-rata Lama Rawat (Length of Stay)
-    const totalStayHours = dischargedPatients.reduce((sum, p) => {
-        const stay = getSecondsFromTS(p.dischargedAt) - getSecondsFromTS(p.surgeryFinishTime);
-        return sum + (stay / 3600); // in hours
-    }, 0);
-    const avgStayHours = (totalStayHours / dischargedPatients.length).toFixed(1);
-
-    // 2. Distribusi Level Mobilisasi Saat Pulang
-    const mobilityAtDischargeCounts = appData.mobilityScale.map(level => {
-        return dischargedPatients.filter(p => p.latestObservation?.mobilityLevel === level.level).length;
-    });
-
     container.innerHTML = `
-        <div class="analysis-grid">
-            <div class="stat-card">
-                <div class="stat-icon"><i class="fas fa-hospital-user"></i></div>
-                <div class="stat-content">
-                    <div class="stat-value">${dischargedPatients.length}</div>
-                    <div class="stat-label">Total Pasien Pulang</div>
-                </div>
+        <div class="analysis-grid-varied">
+            <div class="chart-container">
+                <h4>Progres Mobilisasi per Hari Post-Op</h4>
+                <canvas id="progress-by-pod-chart"></canvas>
             </div>
-            <div class="stat-card">
-                <div class="stat-icon"><i class="fas fa-clock"></i></div>
-                <div class="stat-content">
-                    <div class="stat-value">${avgStayHours}</div>
-                    <div class="stat-label">Rata-rata Jam Rawat Post-OP</div>
-                </div>
+            <div class="chart-container">
+                <h4>Rata-rata Level Mobilisasi per Jenis Operasi</h4>
+                <canvas id="mobility-by-op-chart"></canvas>
             </div>
-            <div class="chart-container full-width">
-                <h4>Distribusi Level Mobilisasi Pasien Saat Pulang</h4>
-                <canvas id="discharge-mobility-chart"></canvas>
+            <div class="chart-container full-span">
+                <h4>Pengaruh Hambatan (PONV/RASS) Terhadap Pencapaian Target</h4>
+                <canvas id="barrier-impact-chart"></canvas>
             </div>
         </div>
-         <div class="interpretation-card">
-            <h4>Interpretasi</h4>
-            <p>Dari <strong>${dischargedPatients.length}</strong> pasien yang telah pulang, rata-rata lama perawatan pasca operasi adalah <strong>${avgStayHours} jam</strong>. Grafik di atas menunjukkan kapabilitas mobilisasi pasien pada saat mereka dinyatakan boleh pulang. Mayoritas pasien mencapai level mobilisasi tinggi, yang menandakan keberhasilan program dalam memfasilitasi pemulihan fungsional pasien.</p>
+        <div class="interpretation-card">
+            <h4>Interpretasi Wawasan</h4>
+            <p>Grafik di atas memberikan wawasan kunci: <strong>(1)</strong> Progresivitas mobilisasi pasien seiring waktu, idealnya menunjukkan tren naik. <strong>(2)</strong> Perbandingan efektivitas mobilisasi antar jenis operasi, menyoroti operasi mana yang mungkin memerlukan perhatian lebih. <strong>(3)</strong> Dampak signifikan dari hambatan seperti mual dan tingkat kesadaran terhadap kemampuan pasien mencapai target mobilisasi harian mereka.</p>
         </div>
     `;
 
-    const chartData = {
-        labels: appData.mobilityScale.map(l => `Level ${l.level}`),
-        datasets: [{
-            label: 'Jumlah Pasien',
-            data: mobilityAtDischargeCounts,
-            backgroundColor: 'rgba(33, 128, 141, 0.6)',
-            borderColor: 'rgba(33, 128, 141, 1)',
-            borderWidth: 1,
-            borderRadius: 4,
-        }]
-    };
-    renderChart('discharge-mobility-chart', 'bar', chartData, { indexAxis: 'y', scales: { x: { beginAtZero: true, ticks: { stepSize: 1 } } } });
+    // 1. Data untuk Progres per POD (Line Chart)
+    const progressByPod = {};
+    data.forEach(p => {
+        if (p.latestObservation && p.surgeryFinishTime) {
+            const hoursPostOp = (getSecondsFromTS(p.latestObservation.createdAt || p.createdAt) - getSecondsFromTS(p.surgeryFinishTime)) / 3600;
+            const pod = Math.floor(hoursPostOp / 24);
+            if (pod < 5) { // Batasi hingga POD 4
+                if (!progressByPod[pod]) progressByPod[pod] = [];
+                progressByPod[pod].push(p.latestObservation.mobilityLevel);
+            }
+        }
+    });
+    const podLabels = Object.keys(progressByPod).sort();
+    const podData = podLabels.map(pod => {
+        const levels = progressByPod[pod];
+        return levels.reduce((a, b) => a + b, 0) / levels.length;
+    });
+    renderChart('progress-by-pod-chart', 'line', {
+        labels: podLabels.map(l => `POD ${l}`),
+        datasets: [{ label: 'Rata-rata Level', data: podData, tension: 0.1, fill: false, borderColor: 'var(--color-primary)' }]
+    });
+
+    // 2. Data untuk Rata-rata Level per Jenis Operasi (Bar Chart)
+    const mobilityByOp = {};
+    data.forEach(p => {
+        if (p.latestObservation) {
+            if (!mobilityByOp[p.operation]) mobilityByOp[p.operation] = [];
+            mobilityByOp[p.operation].push(p.latestObservation.mobilityLevel);
+        }
+    });
+    const opLabels = Object.keys(mobilityByOp);
+    const opData = opLabels.map(op => {
+        const levels = mobilityByOp[op];
+        return levels.reduce((a, b) => a + b, 0) / levels.length;
+    });
+    renderChart('mobility-by-op-chart', 'bar', {
+        labels: opLabels,
+        datasets: [{ label: 'Rata-rata Level', data: opData, backgroundColor: 'rgba(var(--color-teal-500-rgb), 0.7)' }]
+    }, { indexAxis: 'y', scales: { x: { beginAtZero: true } } });
+
+    // 3. Data untuk Pengaruh Hambatan (Stacked Bar Chart)
+    let barrierAchieved = 0, barrierNotAchieved = 0;
+    let noBarrierAchieved = 0, noBarrierNotAchieved = 0;
+    data.forEach(p => {
+        if (p.latestObservation) {
+            const plan = getMobilizationPlan(p);
+            const hasBarrier = p.latestObservation.ponv !== 'Tidak Ada' || p.latestObservation.rass !== 'Sadar & Tenang';
+            if (hasBarrier) {
+                plan.isTargetAchieved ? barrierAchieved++ : barrierNotAchieved++;
+            } else {
+                plan.isTargetAchieved ? noBarrierAchieved++ : noBarrierNotAchieved++;
+            }
+        }
+    });
+    renderChart('barrier-impact-chart', 'bar', {
+        labels: ['Tanpa Hambatan (PONV/RASS)', 'Dengan Hambatan (PONV/RASS)'],
+        datasets: [
+            { label: 'Target Tercapai', data: [noBarrierAchieved, barrierAchieved], backgroundColor: 'rgba(var(--color-success-rgb), 0.7)' },
+            { label: 'Target Belum Tercapai', data: [noBarrierNotAchieved, barrierNotAchieved], backgroundColor: 'rgba(var(--color-error-rgb), 0.6)' }
+        ]
+    }, { scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } } });
 }
+
 
 function renderChart(canvasId, type, data, options = {}) {
     const ctx = document.getElementById(canvasId).getContext('2d');
     if (chartInstances[canvasId]) {
         chartInstances[canvasId].destroy();
     }
+    const defaultOptions = {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                display: type === 'bar' && options.scales?.x?.stacked, // Only display legend for stacked bar
+                position: 'top',
+            },
+        },
+    };
     chartInstances[canvasId] = new Chart(ctx, {
         type: type,
         data: data,
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: { legend: { display: false } },
-            ...options
-        }
+        options: { ...defaultOptions, ...options }
     });
 }
 
@@ -791,3 +823,4 @@ function showConfirmationDialog(message, onConfirm) {
     };
     document.getElementById('confirm-cancel').onclick = closeDialog;
 }
+

@@ -174,20 +174,38 @@ p:last-child { margin-bottom: 0; }
 .mobility-level-item p strong { color: var(--color-text); }
 .table-container { overflow-x: auto; background: var(--color-surface); border-radius: var(--radius-lg); border: 1px solid var(--color-card-border); margin-top: var(--space-24); }
 .patient-table { width: 100%; border-collapse: collapse; }
-.patient-table th, .patient-table td { padding: var(--space-12) var(--space-16); text-align: left; border-bottom: 1px solid var(--color-border); white-space: nowrap; vertical-align: middle; }
+
+/* PERUBAHAN: Merapikan tabel dasbor */
+.patient-table th, .patient-table td {
+    padding: var(--space-16);
+    text-align: left;
+    border-bottom: 1px solid var(--color-border);
+    white-space: nowrap;
+    vertical-align: top;
+}
+.patient-table th:nth-child(1), .patient-table td:nth-child(1) { width: 15%; min-width: 160px; } 
+.patient-table th:nth-child(2), .patient-table td:nth-child(2) { width: 15%; min-width: 150px; } 
+.patient-table th:nth-child(8), .patient-table td:nth-child(8) { width: 30%; min-width: 280px; } 
+.suggestion-text {
+    white-space: normal;
+    font-size: var(--font-size-sm);
+    line-height: 1.5;
+    max-width: none;
+}
+
 .patient-table th { background-color: var(--color-bg-1); font-weight: var(--font-weight-bold); font-size: var(--font-size-sm); }
 .patient-table tbody tr:hover { background-color: var(--color-secondary); }
 .patient-table .post-op-time { font-weight: var(--font-weight-medium); color: var(--color-primary); }
 .patient-table .no-data-row td { text-align: center; padding: var(--space-32); color: var(--color-text-secondary); white-space: normal; }
 .action-buttons { display: flex; gap: var(--space-8); margin-top: var(--space-8); flex-wrap: wrap; }
-.suggestion-text { font-size: var(--font-size-sm); white-space: normal; max-width: 250px; line-height: 1.4; }
 
-/* PERUBAHAN: Style untuk halaman Analisis */
+
+/* Style untuk halaman Analisis */
 .analysis-section { margin-bottom: var(--space-32); }
 .section-title { font-size: var(--font-size-xl); margin-bottom: var(--space-8); display: flex; align-items: center; gap: var(--space-8); }
 .section-subtitle { font-size: var(--font-size-base); color: var(--color-text-secondary); margin-bottom: var(--space-24); max-width: 800px; }
 .analysis-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: var(--space-24); }
-/* PERUBAHAN: Grid baru untuk layout analisis yang lebih bervariasi */
+
 .analysis-grid-varied {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
@@ -202,9 +220,23 @@ p:last-child { margin-bottom: 0; }
 .stat-icon { font-size: 32px; color: var(--color-primary); }
 .stat-value { font-size: var(--font-size-3xl); font-weight: var(--font-weight-bold); line-height: 1; }
 .stat-label { font-size: var(--font-size-sm); color: var(--color-text-secondary); }
-.chart-container { background-color: var(--color-surface); border-radius: var(--radius-lg); padding: var(--space-24); border: 1px solid var(--color-card-border); min-height: 350px; }
-.chart-container.full-width { grid-column: 1 / -1; }
+
+/* PERUBAHAN: Mempercantik tampilan chart */
+.chart-container {
+    background-color: var(--color-surface);
+    border-radius: var(--radius-lg);
+    padding: var(--space-24);
+    border: 1px solid var(--color-card-border);
+    box-shadow: var(--shadow-sm);
+    transition: box-shadow var(--duration-normal) var(--ease-standard);
+    position: relative; /* Diperlukan agar canvas tidak overflow */
+    min-height: 380px; /* Memberi ruang yang cukup */
+}
+.chart-container:hover {
+    box-shadow: var(--shadow-md);
+}
 .chart-container h4 { margin-bottom: var(--space-16); text-align: center; }
+
 .interpretation-card { margin-top: var(--space-24); padding: var(--space-24); background-color: var(--color-bg-1); border-left: 4px solid var(--color-primary); border-radius: var(--radius-base); }
 .interpretation-card h4 { margin-bottom: var(--space-8); }
 
@@ -219,6 +251,11 @@ p:last-child { margin-bottom: 0; }
 .modal-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-16); }
 .modal-grid .full-width { grid-column: 1 / -1; }
 .modal-footer { margin-top: var(--space-24); display: flex; justify-content: flex-end; }
+/* PERUBAHAN: Style untuk kontainer input operasi lainnya */
+#other-operation-container {
+    margin-top: -8px;
+    margin-bottom: var(--space-16);
+}
 
 .toast { position: fixed; top: var(--space-20); right: var(--space-20); background: var(--color-surface); border: 1px solid var(--color-card-border); border-radius: var(--radius-base); box-shadow: var(--shadow-lg); padding: var(--space-16); z-index: 3000; transform: translateX(120%); opacity: 0; transition: all var(--duration-normal) var(--ease-standard); }
 .toast.show { transform: translateX(0); opacity: 1; }
@@ -229,7 +266,6 @@ p:last-child { margin-bottom: 0; }
 .hidden { display: none !important; }
 
 @media (max-width: 992px) {
-  /* PERUBAHAN: Buat grid analisis menjadi satu kolom di layar tablet */
   .analysis-grid-varied {
     grid-template-columns: 1fr;
   }

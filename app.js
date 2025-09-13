@@ -1,9 +1,9 @@
-// app.js — MODIFIED with PROMIS, JH-HLM Scale, and Advanced Suggestions
-// FIX: Added stability checks for suggestion logic and restored initial mobility input.
+// app.js — MODIFIED with Delete Function, No Archive View, and Data Analysis Dashboard
 
 // Import Firebase services
+// PERUBAHAN: Menambahkan deleteDoc
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-import { getFirestore, collection, addDoc, doc, onSnapshot, updateDoc, query, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+import { getFirestore, collection, addDoc, doc, onSnapshot, updateDoc, query, serverTimestamp, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
 // --- KONFIGURASI APLIKASI ---
@@ -47,6 +47,9 @@ const appData = {
 let db, auth;
 let userId, clinicId;
 let patientsData = [];
+// Variabel untuk menyimpan instance chart agar bisa di-destroy
+let mobilityChartInstance, anesthesiaChartInstance;
+
 
 document.addEventListener('DOMContentLoaded', () => {
     setupClinicId();
@@ -167,23 +170,19 @@ function listenForPatientUpdates() {
     const tableBody = document.getElementById('patient-table-body');
     if (tableBody) tableBody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding: 20px;"><i class="fas fa-spinner fa-spin"></i> Memuat data pasien...</td></tr>`;
     
-    const archivedTableBody = document.getElementById('archived-patient-table-body');
-    if (archivedTableBody) archivedTableBody.innerHTML = `<tr><td colspan="4" style="text-align:center; padding: 20px;"><i class="fas fa-spinner fa-spin"></i> Memuat arsip...</td></tr>`;
-
     onSnapshot(q, snapshot => {
         patientsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         
         const activePatients = patientsData.filter(p => p.status === 'aktif' && p.surgeryFinishTime).sort((a,b) => getSecondsFromTS(b.surgeryFinishTime) - getSecondsFromTS(a.surgeryFinishTime));
-        const archivedPatients = patientsData.filter(p => p.status === 'diarsipkan' && p.dischargedAt).sort((a,b) => getSecondsFromTS(b.dischargedAt) - getSecondsFromTS(a.dischargedAt));
         
         renderPatientTable(activePatients);
-        renderArchivedPatientTable(archivedPatients);
+        // PERUBAHAN: Memanggil fungsi analisis data
+        renderDataAnalysis(activePatients);
 
     }, error => {
         console.error("Error listening to patient updates:", error);
         showToast("Gagal memuat data pasien.", "error");
         if (tableBody) tableBody.innerHTML = `<tr><td colspan="8" style="text-align:center; color: var(--color-error); padding: 20px;"><i class="fas fa-exclamation-triangle"></i> Gagal memuat data.</td></tr>`;
-        if (archivedTableBody) archivedTableBody.innerHTML = `<tr><td colspan="4" style="text-align:center; color: var(--color-error); padding: 20px;"><i class="fas fa-exclamation-triangle"></i> Gagal memuat arsip.</td></tr>`;
     });
 }
 
@@ -197,7 +196,6 @@ async function saveNewPatient() {
     if (!name || !rm || !finishTimeValue) return showToast("Harap lengkapi data pasien.", "error");
     if (!selectedNurse) return showToast("Pilih nama perawat terlebih dahulu.", "warning");
 
-    // FIX: Membaca level mobilisasi awal dari input modal
     const initialObservation = {
         mobilityLevel: parseInt(document.getElementById('initial-mobility').value),
         painScale: 0,
@@ -256,7 +254,7 @@ async function savePatientUpdate(e) {
 
 async function dischargePatient(patientId) {
     if(!userId || !clinicId) return showToast("Koneksi ke database belum siap.", "error");
-    showConfirmationDialog("Apakah Anda yakin ingin menandai pasien ini sebagai 'Pulang'?", async () => {
+    showConfirmationDialog("Apakah Anda yakin ingin menandai pasien ini sebagai 'Pulang'? Pasien akan diarsipkan dari dasbor utama.", async () => {
         try {
             const docPath = `clinics/${clinicId}/patients/${patientId}`;
             const patientRef = doc(db, docPath);
@@ -271,6 +269,23 @@ async function dischargePatient(patientId) {
         }
     });
 }
+
+// PERUBAHAN: Fungsi baru untuk menghapus pasien
+async function deletePatient(patientId) {
+    if (!userId || !clinicId) return showToast("Koneksi ke database belum siap.", "error");
+    
+    showConfirmationDialog("Apakah Anda yakin ingin MENGHAPUS data pasien ini secara permanen? Aksi ini tidak bisa dibatalkan.", async () => {
+        try {
+            const docPath = `clinics/${clinicId}/patients/${patientId}`;
+            await deleteDoc(doc(db, docPath));
+            showToast("Data pasien berhasil dihapus.", "success");
+        } catch (error) {
+            console.error("Error deleting patient:", error);
+            showToast("Gagal menghapus data pasien.", "error");
+        }
+    });
+}
+
 
 // --- FUNGSI UTILITAS & RENDER ---
 
@@ -329,6 +344,11 @@ function setupEventListeners() {
         if (e.target.closest('.discharge-patient-btn')) {
             const patientId = e.target.closest('.discharge-patient-btn').dataset.id;
             dischargePatient(patientId);
+        }
+        // PERUBAHAN: Menambahkan listener untuk tombol hapus
+        if (e.target.closest('.delete-patient-btn')) {
+            const patientId = e.target.closest('.delete-patient-btn').dataset.id;
+            deletePatient(patientId);
         }
         if (e.target.matches('.modal-close-btn') || e.target.matches('.modal-overlay')) {
             if(!document.getElementById('clinic-id-modal').classList.contains('hidden')) return;
@@ -432,28 +452,15 @@ function renderPatientTable(patients) {
                     <div class="action-buttons">
                         <button class="btn btn--primary btn--sm update-patient-btn" data-id="${p.id}"><i class="fas fa-edit"></i> Update</button>
                         <button class="btn btn--success btn--sm discharge-patient-btn" data-id="${p.id}"><i class="fas fa-check-circle"></i> Pulang</button>
+                        <!-- PERUBAHAN: Menambahkan tombol Hapus -->
+                        <button class="btn btn--danger btn--sm delete-patient-btn" data-id="${p.id}"><i class="fas fa-trash-alt"></i> Hapus</button>
                     </div>
                 </td>
             </tr>`;
     }).join('');
 }
 
-function renderArchivedPatientTable(patients) {
-    const tableBody = document.getElementById('archived-patient-table-body');
-    if(!tableBody) return;
-    if (patients.length === 0) {
-        tableBody.innerHTML = `<tr class="no-data-row"><td colspan="4">Belum ada pasien yang diarsipkan.</td></tr>`;
-        return;
-    }
-    tableBody.innerHTML = patients.map(p => `
-        <tr>
-            <td><strong>${p.name}</strong><br><small>${p.rm}</small></td>
-            <td>${p.operation}</td>
-            <td>${p.dischargedAt ? new Date(getSecondsFromTS(p.dischargedAt) * 1000).toLocaleDateString('id-ID') : 'N/A'}</td>
-            <td><button class="btn btn--secondary btn--sm" disabled>Diarsipkan</button></td>
-        </tr>
-    `).join('');
-}
+// PERUBAHAN: Menghapus fungsi renderArchivedPatientTable
 
 function calculateIdealMobility(patient, latestObs) {
     const hoursPostOp = (Date.now() - (getSecondsFromTS(patient.surgeryFinishTime) * 1000)) / (3600 * 1000);
@@ -484,7 +491,6 @@ function calculateIdealMobility(patient, latestObs) {
     }
 }
 
-// FIX: Menambahkan pengecekan untuk mencegah error jika level tidak ditemukan
 function generateActionSuggestion(latestObs, idealMobility) {
     const currentLevel = latestObs.mobilityLevel;
     const idealLevel = idealMobility.level;
@@ -502,7 +508,6 @@ function generateActionSuggestion(latestObs, idealMobility) {
         const targetAction = appData.mobilityScale.find(s => s.level === idealLevel);
         const currentAction = appData.mobilityScale.find(s => s.level === currentLevel);
         
-        // Pengecekan untuk memastikan objek ditemukan sebelum mengakses properti .name
         const currentActionName = currentAction ? currentAction.name : 'Level Saat Ini';
         const targetActionName = targetAction ? targetAction.name : 'Target Berikutnya';
 
@@ -510,7 +515,6 @@ function generateActionSuggestion(latestObs, idealMobility) {
     }
 }
 
-// FIX: Mengembalikan input mobilisasi awal di modal tambah pasien
 function openPatientModal(patientId = null) {
     const isEditing = patientId !== null;
     const patient = isEditing ? patientsData.find(p => p.id === patientId) : null;
@@ -580,6 +584,101 @@ function startRealtimeClocks() {
     setInterval(updateTimes, 1000 * 30);
     updateTimes();
 }
+
+// PERUBAHAN: Fungsi baru untuk merender analisis data
+function renderDataAnalysis(patients) {
+    const analysisSection = document.getElementById('data-analysis-section');
+    if (patients.length === 0) {
+        analysisSection.classList.add('hidden');
+        return;
+    }
+    analysisSection.classList.remove('hidden');
+
+    // 1. Hitung Statistik
+    const totalPatients = patients.length;
+    const totalMobilityScore = patients.reduce((sum, p) => sum + (p.latestObservation?.mobilityLevel || 0), 0);
+    const avgMobility = totalPatients > 0 ? (totalMobilityScore / totalPatients).toFixed(1) : 0;
+
+    document.getElementById('total-patients-stat').textContent = totalPatients;
+    document.getElementById('avg-mobility-stat').textContent = avgMobility;
+    
+    // 2. Data untuk Grafik Distribusi Mobilitas
+    const mobilityCounts = appData.mobilityScale.map(level => {
+        return patients.filter(p => p.latestObservation?.mobilityLevel === level.level).length;
+    });
+    
+    const mobilityData = {
+        labels: appData.mobilityScale.map(level => `Level ${level.level}`),
+        datasets: [{
+            label: 'Jumlah Pasien',
+            data: mobilityCounts,
+            backgroundColor: 'rgba(33, 128, 141, 0.6)',
+            borderColor: 'rgba(33, 128, 141, 1)',
+            borderWidth: 1
+        }]
+    };
+    
+    // 3. Data untuk Grafik Proporsi Anestesi
+    const anesthesiaCounts = appData.anesthesiaTypes.map(type => {
+        return { type: type, count: patients.filter(p => p.anesthesia === type).length };
+    }).filter(item => item.count > 0);
+
+    const anesthesiaData = {
+        labels: anesthesiaCounts.map(item => item.type),
+        datasets: [{
+            label: 'Jumlah Pasien',
+            data: anesthesiaCounts.map(item => item.count),
+            backgroundColor: [
+                'rgba(41, 150, 161, 0.7)',
+                'rgba(230, 129, 97, 0.7)',
+                'rgba(98, 108, 113, 0.7)',
+                'rgba(94, 82, 64, 0.7)'
+            ],
+            borderColor: '#fff',
+            borderWidth: 2
+        }]
+    };
+
+    // 4. Render Grafik
+    renderBarChart('mobility-chart-canvas', mobilityData, mobilityChartInstance, (chart) => mobilityChartInstance = chart);
+    renderDoughnutChart('anesthesia-chart-canvas', anesthesiaData, anesthesiaChartInstance, (chart) => anesthesiaChartInstance = chart);
+}
+
+function renderBarChart(canvasId, data, chartInstance, setInstance) {
+    const ctx = document.getElementById(canvasId).getContext('2d');
+    if (chartInstance) {
+        chartInstance.destroy();
+    }
+    const newChart = new Chart(ctx, {
+        type: 'bar',
+        data: data,
+        options: {
+            scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } },
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } }
+        }
+    });
+    setInstance(newChart);
+}
+
+function renderDoughnutChart(canvasId, data, chartInstance, setInstance) {
+    const ctx = document.getElementById(canvasId).getContext('2d');
+    if (chartInstance) {
+        chartInstance.destroy();
+    }
+    const newChart = new Chart(ctx, {
+        type: 'doughnut',
+        data: data,
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { position: 'top' } }
+        }
+    });
+    setInstance(newChart);
+}
+
 
 function showToast(message, type = 'info') {
     const toast = document.getElementById('toast');

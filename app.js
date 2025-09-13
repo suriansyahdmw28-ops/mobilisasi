@@ -8,7 +8,8 @@ import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gsta
 // --- KONFIGURASI APLIKASI ---
 const appData = {
     nurses: ["Suriansyah, S.Kep., Ns", "Akbar Wirahadi, A.Md.Kep", "Annisa Aulia Rahma, A.Md.Kep", "Dina Ghufriana, S.Kep.Ners", "Dwi Sucilowati, AMK", "Gusti Rusmiyati, S.Kep.Ners", "Gusti Rusmiyati, S.Kep.Ners", "Herliyana Paramitha, S.Kep.,Ners", "Isnawati, AMK", "Khairun Nisa, S.Kep.Ners", "Noor Makiah, AMK", "Nurmilah A, A.Md.Kep", "Qatrunnada Mufidah, A.Md.Kep", "Raudatul Hikmah, S.Kep., Ns", "Verawaty, AMK", "Zahratul Zannah, S.Kep., Ns"],
-    operations: ["Appendectomy", "Hernia Repair", "Laparotomy", "Mastectomy", "BPH", "Excision", "Debridement", "ORIF", "ROI"],
+    // PERUBAHAN: Menambahkan opsi "Lainnya..."
+    operations: ["Appendectomy", "Hernia Repair", "Laparotomy", "Mastectomy", "BPH", "Excision", "Debridement", "ORIF", "ROI", "Lainnya..."],
     anesthesiaTypes: ["General Anesthesia", "Spinal Anesthesia", "Epidural Anesthesia", "Regional Block"],
     mobilityScale: [
         {level: 1, name: "Level 1: Berbaring di Tempat Tidur", description: "Pasien berbaring, dapat melakukan miring kanan/kiri secara mandiri."},
@@ -48,6 +49,11 @@ let userId, clinicId;
 let allPatientsData = [];
 let questionnaireData = [];
 let chartInstances = {};
+
+// PERUBAHAN: Menambahkan default styling untuk Chart.js
+Chart.defaults.font.family = "'Inter', sans-serif";
+Chart.defaults.color = 'var(--color-text-secondary)';
+Chart.defaults.borderColor = 'rgba(var(--color-brown-600-rgb), 0.1)';
 
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -203,6 +209,16 @@ async function saveNewPatient() {
     const finishTimeValue = document.getElementById('patient-finish-time').value;
     const selectedNurse = document.getElementById('current-nurse-selector').value;
     
+    // PERUBAHAN: Logika untuk mendapatkan jenis operasi
+    const operationSelect = document.getElementById('patient-operation').value;
+    let finalOperation = operationSelect;
+    if (operationSelect === 'Lainnya...') {
+        finalOperation = document.getElementById('patient-operation-other').value.trim();
+        if (!finalOperation) {
+            return showToast("Harap sebutkan jenis operasi.", "error");
+        }
+    }
+
     if (!name || !rm || !finishTimeValue) return showToast("Harap lengkapi data pasien.", "error");
     if (!selectedNurse) return showToast("Pilih nama perawat terlebih dahulu.", "warning");
 
@@ -217,7 +233,7 @@ async function saveNewPatient() {
     
     const newPatient = {
         name, rm, 
-        operation: document.getElementById('patient-operation').value,
+        operation: finalOperation,
         anesthesia: document.getElementById('patient-anesthesia').value,
         surgeryFinishTime: new Date(finishTimeValue),
         createdAt: serverTimestamp(),
@@ -245,7 +261,7 @@ async function savePatientUpdate(e) {
     if(!selectedNurse) return showToast("Pilih nama perawat terlebih dahulu.", "warning");
     const newObservation = {
         mobilityLevel: parseInt(document.getElementById('update-mobility').value),
-        painScale: parseInt(document.getElementById('update-pain').value), // Pastikan painScale juga diupdate
+        painScale: parseInt(document.getElementById('update-pain').value),
         ponv: document.getElementById('update-ponv').value,
         rass: document.getElementById('update-rass').value,
         notes: document.getElementById('update-notes').value,
@@ -447,7 +463,6 @@ function renderPatientTable(patients) {
         return;
     }
     tableBody.innerHTML = patients.map(p => {
-        // PERUBAHAN: Menggunakan logic engine baru
         const plan = getMobilizationPlan(p);
         const latestObs = p.latestObservation || { ponv: 'N/A', rass: 'N/A', mobilityLevel: 1 };
         const finishSeconds = getSecondsFromTS(p.surgeryFinishTime);
@@ -472,7 +487,7 @@ function renderPatientTable(patients) {
     }).join('');
 }
 
-// --- PERUBAHAN BESAR: MOBILIZATION LOGIC ENGINE ---
+// --- MOBILIZATION LOGIC ENGINE ---
 function getMobilizationPlan(patient) {
     const latestObs = patient.latestObservation || { mobilityLevel: 1, ponv: 'Tidak Ada', rass: 'Sadar & Tenang', painScale: 0 };
     const hoursPostOp = (Date.now() - (getSecondsFromTS(patient.surgeryFinishTime) * 1000)) / (3600 * 1000);
@@ -550,11 +565,16 @@ function openPatientModal(patientId = null) {
     document.getElementById('modal-title').textContent = isEditing ? 'Update Observasi Pasien' : 'Tambah Pasien Baru';
     const modalBody = document.getElementById('modal-body');
     
+    // PERUBAHAN: Menambahkan kontainer untuk input operasi lainnya
     const addForm = `
         <div class="modal-grid">
             <div class="form-group"><label for="patient-name">Nama Pasien</label><input type="text" id="patient-name" class="form-control" required></div>
             <div class="form-group"><label for="patient-rm">Nomor RM</label><input type="text" id="patient-rm" class="form-control" required></div>
-            <div class="form-group full-width"><label for="patient-operation">Jenis Operasi</label><select id="patient-operation" class="form-control">${appData.operations.map(op=>`<option>${op}</option>`).join('')}</select></div>
+            <div class="form-group full-width"><label for="patient-operation">Jenis Operasi</label><select id="patient-operation" class="form-control">${appData.operations.map(op=>`<option value="${op}">${op}</option>`).join('')}</select></div>
+            <div class="form-group full-width hidden" id="other-operation-container">
+                <label for="patient-operation-other">Sebutkan Jenis Operasi</label>
+                <input type="text" id="patient-operation-other" class="form-control" placeholder="Contoh: Tiroidektomi">
+            </div>
             <div class="form-group full-width"><label for="patient-anesthesia">Jenis Anestesi</label><select id="patient-anesthesia" class="form-control">${appData.anesthesiaTypes.map(an=>`<option>${an}</option>`).join('')}</select></div>
             <div class="form-group full-width"><label for="patient-finish-time">Waktu Selesai Operasi</label><input type="datetime-local" id="patient-finish-time" class="form-control" required></div>
         </div>
@@ -592,6 +612,17 @@ function openPatientModal(patientId = null) {
         now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
         document.getElementById('patient-finish-time').value = now.toISOString().slice(0, 16);
         document.getElementById('save-new-patient-btn').addEventListener('click', saveNewPatient);
+
+        // PERUBAHAN: Menambahkan event listener untuk menampilkan/menyembunyikan input "Lainnya..."
+        const operationSelect = document.getElementById('patient-operation');
+        const otherOperationContainer = document.getElementById('other-operation-container');
+        operationSelect.addEventListener('change', () => {
+            if (operationSelect.value === 'Lainnya...') {
+                otherOperationContainer.classList.remove('hidden');
+            } else {
+                otherOperationContainer.classList.add('hidden');
+            }
+        });
     }
     
     document.getElementById('patient-modal').classList.remove('hidden');
@@ -614,7 +645,7 @@ function startRealtimeClocks() {
     updateTimes();
 }
 
-// --- FUNGSI ANALISIS BARU ---
+// --- FUNGSI ANALISIS ---
 
 function renderGlobalAnalysis() {
     renderQuestionnaireAnalysis(questionnaireData);
@@ -666,7 +697,6 @@ function renderQuestionnaireAnalysis(data) {
     `;
 }
 
-// PERUBAHAN: Fungsi Analisis Dasbor yang Sepenuhnya Baru
 function renderPatientDashboardAnalysis(data) {
     const container = document.getElementById('patient-analysis-container');
     if (data.length === 0) {
@@ -701,7 +731,7 @@ function renderPatientDashboardAnalysis(data) {
         if (p.latestObservation && p.surgeryFinishTime) {
             const hoursPostOp = (getSecondsFromTS(p.latestObservation.createdAt || p.createdAt) - getSecondsFromTS(p.surgeryFinishTime)) / 3600;
             const pod = Math.floor(hoursPostOp / 24);
-            if (pod < 5) { // Batasi hingga POD 4
+            if (pod < 5) { 
                 if (!progressByPod[pod]) progressByPod[pod] = [];
                 progressByPod[pod].push(p.latestObservation.mobilityLevel);
             }
@@ -714,7 +744,7 @@ function renderPatientDashboardAnalysis(data) {
     });
     renderChart('progress-by-pod-chart', 'line', {
         labels: podLabels.map(l => `POD ${l}`),
-        datasets: [{ label: 'Rata-rata Level', data: podData, tension: 0.1, fill: false, borderColor: 'var(--color-primary)' }]
+        datasets: [{ label: 'Rata-rata Level', data: podData, tension: 0.2, fill: true, borderColor: 'var(--color-primary)', backgroundColor: 'rgba(var(--color-teal-500-rgb), 0.1)' }]
     });
 
     // 2. Data untuk Rata-rata Level per Jenis Operasi (Bar Chart)
@@ -732,7 +762,7 @@ function renderPatientDashboardAnalysis(data) {
     });
     renderChart('mobility-by-op-chart', 'bar', {
         labels: opLabels,
-        datasets: [{ label: 'Rata-rata Level', data: opData, backgroundColor: 'rgba(var(--color-teal-500-rgb), 0.7)' }]
+        datasets: [{ label: 'Rata-rata Level', data: opData, backgroundColor: 'rgba(var(--color-teal-500-rgb), 0.7)', borderRadius: 4 }]
     }, { indexAxis: 'y', scales: { x: { beginAtZero: true } } });
 
     // 3. Data untuk Pengaruh Hambatan (Stacked Bar Chart)
@@ -752,8 +782,8 @@ function renderPatientDashboardAnalysis(data) {
     renderChart('barrier-impact-chart', 'bar', {
         labels: ['Tanpa Hambatan (PONV/RASS)', 'Dengan Hambatan (PONV/RASS)'],
         datasets: [
-            { label: 'Target Tercapai', data: [noBarrierAchieved, barrierAchieved], backgroundColor: 'rgba(var(--color-success-rgb), 0.7)' },
-            { label: 'Target Belum Tercapai', data: [noBarrierNotAchieved, barrierNotAchieved], backgroundColor: 'rgba(var(--color-error-rgb), 0.6)' }
+            { label: 'Target Tercapai', data: [noBarrierAchieved, barrierAchieved], backgroundColor: 'rgba(var(--color-success-rgb), 0.7)', borderRadius: 4 },
+            { label: 'Target Belum Tercapai', data: [noBarrierNotAchieved, barrierNotAchieved], backgroundColor: 'rgba(var(--color-error-rgb), 0.6)', borderRadius: 4 }
         ]
     }, { scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } } });
 }
@@ -765,16 +795,37 @@ function renderChart(canvasId, type, data, options = {}) {
         chartInstances[canvasId].destroy();
     }
     const defaultOptions = {
+        // PERUBAHAN: Set maintainAspectRatio ke true dan responsive ke true
+        maintainAspectRatio: true, 
         responsive: true,
-        maintainAspectRatio: true,   // ubah dari false -> true
-        aspectRatio: 2.5,
         plugins: {
             legend: {
-                display: type === 'bar' && options.scales?.x?.stacked, // Only display legend for stacked bar
+                display: (type === 'bar' && options.scales?.x?.stacked) || (type === 'doughnut' || type === 'pie'),
                 position: 'top',
             },
+            tooltip: {
+                enabled: true,
+                backgroundColor: 'rgba(var(--color-slate-900-rgb), 0.9)',
+                titleColor: 'var(--color-white)',
+                bodyColor: 'var(--color-white)',
+                padding: 12,
+                cornerRadius: 8,
+                boxPadding: 4,
+                titleFont: { weight: 'bold' },
+                bodyFont: { size: 14 },
+            }
+        },
+        scales: {
+             x: { grid: { display: false }, ticks: { color: 'var(--color-slate-500)'} },
+             y: { grid: { drawBorder: false }, ticks: { color: 'var(--color-slate-500)'} }
         },
     };
+
+    // Hapus scales untuk pie/doughnut karena tidak relevan
+    if (type === 'pie' || type === 'doughnut') {
+        delete defaultOptions.scales;
+    }
+    
     chartInstances[canvasId] = new Chart(ctx, {
         type: type,
         data: data,

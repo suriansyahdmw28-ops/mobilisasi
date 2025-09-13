@@ -1,366 +1,759 @@
-// app.js — MODIFIED with Dashboard, Better UI, and Automatic Suggestions
+// app.js — MODIFIED with a new dedicated Analysis Page
 
 // Import Firebase services
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-import { getFirestore, collection, addDoc, doc, onSnapshot, updateDoc, query, serverTimestamp, deleteDoc, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+import { getFirestore, collection, addDoc, doc, onSnapshot, updateDoc, query, serverTimestamp, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
 // --- KONFIGURASI APLIKASI ---
 const appData = {
-    nurses: ["Suriansyah, S.Kep., Ns", "Akbar Wirahadi, A.Md.Kep", "Annisa Aulia Rahma, A.Md.Kep", "Dina Ghufriana, S.Kep.Ners", "Dwi Sucilowati, AMK", "Gusti Rusmiyati, S.Kep.Ners", "Herliyana Paramitha, S.Kep.,Ners", "Isnawati, AMK", "Khairun Nisa, S.Kep.Ners", "Noor Makiah, AMK", "Nurmilah A, A.Md.Kep", "Qatrunnada Mufidah, A.Md.Kep", "Raudatul Hikmah, S.Kep., Ns", "Verawaty, AMK", "Zahratul Zannah, S.Kep., Ners"],
-    operations: ["Appendiktomi", "Herniotomi", "Laparotomi", "Debridement", "ORIF", "Sectio Caesarea", "Mastektomi", "Kolelitiasis", "Lainnya"],
-    anesthesiaTypes: ["Anestesi Umum", "Anestesi Spinal / Epidural"],
-    mobilizationLevels: [0, 1, 2, 3, 4, 5, 6]
+    nurses: ["Suriansyah, S.Kep., Ns", "Akbar Wirahadi, A.Md.Kep", "Annisa Aulia Rahma, A.Md.Kep", "Dina Ghufriana, S.Kep.Ners", "Dwi Sucilowati, AMK", "Gusti Rusmiyati, S.Kep.Ners", "Gusti Rusmiyati, S.Kep.Ners", "Herliyana Paramitha, S.Kep.,Ners", "Isnawati, AMK", "Khairun Nisa, S.Kep.Ners", "Noor Makiah, AMK", "Nurmilah A, A.Md.Kep", "Qatrunnada Mufidah, A.Md.Kep", "Raudatul Hikmah, S.Kep., Ns", "Verawaty, AMK", "Zahratul Zannah, S.Kep., Ns"],
+    operations: ["Appendectomy", "Hernia Repair", "Laparotomy", "Mastectomy", "BPH", "Excision", "Debridement", "ORIF", "ROI"],
+    anesthesiaTypes: ["General Anesthesia", "Spinal Anesthesia", "Epidural Anesthesia", "Regional Block"],
+    mobilityScale: [
+        {level: 1, name: "Level 1: Berbaring di Tempat Tidur", description: "Pasien berbaring, dapat melakukan miring kanan/kiri secara mandiri."},
+        {level: 2, name: "Level 2: Duduk di Tepi Tempat Tidur", description: "Pasien mampu duduk di tepi tempat tidur setidaknya selama 1 menit."},
+        {level: 3, name: "Level 3: Berdiri", description: "Pasien mampu berdiri di samping tempat tidur setidaknya selama 1 menit."},
+        {level: 4, name: "Level 4: Berjalan di Tempat", description: "Pasien mampu melangkah di tempat di samping tempat tidur."},
+        {level: 5, name: "Level 5: Transfer ke Kursi & Berjalan > 10 Langkah", description: "Mampu pindah ke kursi dan/atau berjalan lebih dari 10 langkah."},
+        {level: 6, name: "Level 6: Berjalan > 7 Meter", description: "Berjalan mandiri dengan atau tanpa alat bantu sejauh lebih dari 7 meter."},
+        {level: 7, name: "Level 7: Berjalan > 30 Meter", description: "Berjalan mandiri dengan atau tanpa alat bantu sejauh lebih dari 30 meter."},
+        {level: 8, name: "Level 8: Naik Turun Tangga", description: "Mampu naik/turun setidaknya satu anak tangga."}
+    ],
+    questionnaire: {
+        questions: [
+            { id: 1, text: "Menggerakkan badan sesegera mungkin setelah operasi akan mempercepat pemulihan.", type: "positive" },
+            { id: 2, text: "Bergerak setelah operasi sangat berbahaya karena bisa membuat jahitan lepas.", type: "negative" },
+            { id: 3, text: "Latihan gerak di tempat tidur adalah langkah pertama yang penting.", type: "positive" },
+            { id: 4, text: "Jika terasa sangat nyeri saat bergerak, lebih baik berhenti dan panggil perawat.", type: "positive" },
+            { id: 5, text: "Dalam 24 jam terakhir, rasa nyeri membuat saya sulit untuk berkonsentrasi pada hal lain.", type: "negative_promis" },
+            { id: 6, text: "Dalam 24 jam terakhir, rasa nyeri mengganggu aktivitas saya di tempat tidur (misal: miring kanan-kiri).", type: "negative_promis" },
+            { id: 7, text: "Saya merasa cukup kuat untuk duduk sendiri di tepi tempat tidur.", type: "positive_promis" },
+            { id: 8, text: "Saya yakin bisa berjalan beberapa langkah tanpa bantuan.", type: "positive_promis" },
+            { id: 9, text: "Manfaat utama bergerak setelah operasi adalah agar bisa cepat pulang.", type: "positive" },
+            { id: 10, text: "Peran keluarga tidak penting, mobilisasi adalah tugas perawat sepenuhnya.", type: "negative" }
+        ],
+        scoring: { 
+            positive: { setuju: 2, ragu: 1, tidak_setuju: 0 }, 
+            negative: { setuju: 0, ragu: 1, tidak_setuju: 2 },
+            negative_promis: { setuju: 0, ragu: 1, tidak_setuju: 2 },
+            positive_promis: { setuju: 2, ragu: 1, tidak_setuju: 0 }
+        }
+    }
 };
 
-// PERUBAHAN: Data untuk saran otomatis berdasarkan CSV
-const mobilizationFactors = {
-  pod: [
-    { day: 0, level: '0-2', suggestion: 'Mulai miring kanan-kiri, tekuk lutut, dan gerakkan pergelangan kaki setiap 2 jam.' },
-    { day: 1, level: '2-4', suggestion: 'Latihan duduk di tepi tempat tidur, usahakan 3-4 kali sehari dengan bantuan.' },
-    { day: 2, level: '4-5', suggestion: 'Target hari ini adalah berdiri di samping tempat tidur dan berjalan beberapa langkah.' },
-    { day: 3, level: '4-5', suggestion: 'Tingkatkan durasi berjalan di sekitar tempat tidur atau di dalam kamar.' },
-    { day: 4, level: '5-6', suggestion: 'Berjalan mandiri di koridor ruangan. Target 3 kali sehari.' },
-  ],
-  anesthesia: {
-    'Anestesi Umum': 'Mobilisasi dimulai setelah sadar penuh & mual terkontrol.',
-    'Anestesi Spinal / Epidural': 'Jangan berdiri sebelum kekuatan & rasa pada kaki kembali normal untuk mencegah risiko jatuh.'
-  }
-};
-
-// --- INISIALISASI FIREBASE ---
-const firebaseConfig = {
-    apiKey: "...", // Ganti dengan konfigurasi Anda
-    authDomain: "...",
-    projectId: "...",
-    storageBucket: "...",
-    messagingSenderId: "...",
-    appId: "..."
-};
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-const auth = getAuth(app);
-
-// --- State Aplikasi ---
-let clinicId = localStorage.getItem('clinicId') || null;
-let clinicPatients = null;
-let unsubscribe = null;
-let currentUserId = null;
+// --- INISIALISASI ---
+let db, auth;
+let userId, clinicId;
+// PERUBAHAN: Memisahkan data untuk dasbor dan untuk analisis
 let allPatientsData = [];
+let questionnaireData = [];
+// Variabel untuk menyimpan instance chart agar bisa di-destroy
+let chartInstances = {};
 
-// --- Chart Variables ---
-let mobilizationChart, patientStatusChart, losChart;
 
-// --- DOM Elements ---
-const tableBody = document.querySelector('#patient-table tbody');
-const modal = document.getElementById('patient-modal');
-const modalBody = document.getElementById('modal-body');
-const modalTitle = document.getElementById('modal-title');
-const clinicIdModal = document.getElementById('clinic-id-modal');
-
-// --- EVENT LISTENERS ---
 document.addEventListener('DOMContentLoaded', () => {
-    setupAuthListener();
-    setupNavigation();
-    setupEventListeners();
+    setupClinicId();
 });
 
-function setupEventListeners() {
-    document.getElementById('add-patient-btn').addEventListener('click', () => openPatientModal());
-    document.getElementById('modal-close-btn').addEventListener('click', closeModal);
-    modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
-    document.getElementById('save-clinic-id-btn').addEventListener('click', saveClinicId);
-    document.getElementById('change-clinic-id').addEventListener('click', showClinicIdModal);
-    tableBody.addEventListener('click', handleTableActions);
-}
-
-// --- FUNGSI AUTENTIKASI & INISIALISASI ---
-function setupAuthListener() {
-    onAuthStateChanged(auth, (user) => {
-        if (user) {
-            currentUserId = user.uid;
-            if (!clinicId) {
-                showClinicIdModal();
-            } else {
-                initializeAppWithClinicId();
-            }
-        } else {
-            signInAnonymously(auth).catch(error => console.error("Anonymous sign-in failed:", error));
-        }
-    });
-}
-
-function showClinicIdModal() {
-    clinicIdModal.classList.remove('hidden');
-    clinicIdModal.style.opacity = '1';
-}
-
-function saveClinicId() {
-    const input = document.getElementById('clinic-id-input');
-    const id = input.value.trim().toLowerCase();
-    if (id) {
-        clinicId = id;
-        localStorage.setItem('clinicId', clinicId);
-        clinicIdModal.style.opacity = '0';
-        setTimeout(() => clinicIdModal.classList.add('hidden'), 300);
-        initializeAppWithClinicId();
+function setupClinicId() {
+    const storedClinicId = localStorage.getItem('mlqClinicId');
+    const modal = document.getElementById('clinic-id-modal');
+    
+    if (storedClinicId) {
+        clinicId = storedClinicId;
+        modal.classList.add('hidden');
+        initializeAppSequence();
     } else {
-        showToast('error', 'ID Klinik tidak boleh kosong.');
-    }
-}
-
-function initializeAppWithClinicId() {
-    if (unsubscribe) unsubscribe();
-    clinicPatients = collection(db, `mobilization-data/${clinicId}/patients`);
-    listenForPatientUpdates();
-    showToast('success', `Data untuk klinik '${clinicId}' berhasil dimuat.`);
-}
-
-// --- FUNGSI NAVIGASI ---
-function setupNavigation() {
-    const navItems = document.querySelectorAll('.nav-item[data-page]');
-    navItems.forEach(item => {
-        item.addEventListener('click', () => {
-            const pageId = item.dataset.page;
-            
-            document.querySelectorAll('.page').forEach(p => p.classList.add('hidden'));
-            document.getElementById(`${pageId}-page`).classList.remove('hidden');
-
-            navItems.forEach(i => i.classList.remove('active'));
-            item.classList.add('active');
-            
-            // PERUBAHAN: Render dashboard jika halaman analisis dibuka
-            if (pageId === 'analisis') {
-                initDashboard(allPatientsData);
+        modal.classList.remove('hidden');
+        document.getElementById('save-clinic-id-btn').addEventListener('click', () => {
+            const inputId = document.getElementById('clinic-id-input').value.trim().toUpperCase().replace(/\s+/g, '-');
+            if (inputId) {
+                clinicId = inputId;
+                localStorage.setItem('mlqClinicId', clinicId);
+                modal.classList.add('hidden');
+                initializeAppSequence();
+            } else {
+                showToast("ID Klinik tidak boleh kosong.", "error");
             }
         });
-    });
-}
-
-// --- FUNGSI CRUD & DATA FIREBASE ---
-function listenForPatientUpdates() {
-    const q = query(clinicPatients);
-    unsubscribe = onSnapshot(q, (snapshot) => {
-        allPatientsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        displayPatients(allPatientsData);
-        // PERUBAHAN: Update dashboard secara real-time jika sedang aktif
-        if (!document.getElementById('analisis-page').classList.contains('hidden')) {
-            initDashboard(allPatientsData);
-        }
-    }, error => console.error("Error listening to patient updates:", error));
-}
-
-async function savePatient(patientId, patientData) {
-    try {
-        if (patientData.waktuSelesaiOperasi && typeof patientData.waktuSelesaiOperasi === 'string') {
-            patientData.waktuSelesaiOperasi = new Date(patientData.waktuSelesaiOperasi);
-        }
-
-        if (patientId) {
-            const patientRef = doc(db, clinicPatients.path, patientId);
-            await updateDoc(patientRef, patientData);
-            showToast('success', 'Data pasien berhasil diperbarui.');
-        } else {
-            patientData.createdAt = serverTimestamp();
-            patientData.status = 'dirawat';
-            await addDoc(clinicPatients, patientData);
-            showToast('success', 'Pasien baru berhasil ditambahkan.');
-        }
-        closeModal();
-    } catch (error) {
-        console.error("Error saving patient:", error);
-        showToast('error', 'Gagal menyimpan data pasien.');
     }
 }
 
-async function deletePatient(patientId) {
+function initializeAppSequence() {
+    initializeFirebase();
+    setupEventListeners();
+    populateNurseSelector();
+    generateQuestionnaire();
+    displayMobilityScaleInfo();
+    startRealtimeClocks();
+}
+
+async function initializeFirebase() {
     try {
-        const patientRef = doc(db, clinicPatients.path, patientId);
-        await deleteDoc(patientRef);
-        showToast('success', 'Data pasien telah dihapus.');
+        const firebaseConfig = {
+            apiKey: "AIzaSyDXLA7gDQcQtoOrgdW2PnTmYg8q7YQ0OLU",
+            authDomain: "mobilisasi-69979.firebaseapp.com",
+            projectId: "mobilisasi-69979",
+            storageBucket: "mobilisasi-69979.firebasestorage.app",
+            messagingSenderId: "97383306678",
+            appId: "1:97383306678:web:559cfabae7d7ba24631d17",
+            measurementId: "G-HQL9JQBMN3"
+        };
+        
+        const app = initializeApp(firebaseConfig);
+        db = getFirestore(app);
+        auth = getAuth(app);
+
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                userId = user.uid;
+                console.log("Firebase Authenticated. User ID:", userId, "| Clinic ID:", clinicId);
+                // PERUBAHAN: Memanggil listener untuk kedua koleksi data
+                listenForPatientUpdates(); 
+                listenForQuestionnaireUpdates();
+            } else {
+                userId = null;
+            }
+        });
+        
+        await signInAnonymously(auth);
+
     } catch (error) {
-        console.error("Error deleting patient:", error);
-        showToast('error', 'Gagal menghapus data pasien.');
+        console.error("Firebase Initialization Error:", error);
+        showToast(`Error Inisialisasi: ${error.message}`, "error");
+    }
+}
+
+async function addObservationToPatient(patientId, observation) {
+    const obsCollectionPath = `clinics/${clinicId}/patients/${patientId}/observations`;
+    const patientDocPath = `clinics/${clinicId}/patients/${patientId}`;
+
+    await addDoc(collection(db, obsCollectionPath), { ...observation, createdAt: serverTimestamp() });
+    await updateDoc(doc(db, patientDocPath), { latestObservation: { ...observation, createdAt: serverTimestamp() } });
+}
+
+async function handleQuestionnaireSubmit(e) {
+    e.preventDefault();
+    if (!userId || !clinicId) return showToast("Database belum siap.", "error");
+    
+    const patientName = document.getElementById('q-patient-name').value;
+    const patientRM = document.getElementById('q-patient-rm').value;
+    if (!patientName || !patientRM) return showToast("Harap lengkapi Nama dan Nomor RM.", "error");
+
+    const formData = new FormData(e.target);
+    let totalScore = 0;
+    const answers = {};
+    for (const q of appData.questionnaire.questions) {
+        const answer = formData.get(`q_${q.id}`);
+        if (!answer) return showToast("Harap jawab semua pertanyaan.", "warning");
+        answers[q.id] = answer;
+        totalScore += appData.questionnaire.scoring[q.type][answer];
+    }
+    
+    const collectionPath = `clinics/${clinicId}/questionnaires`;
+    const resultData = { patientName, patientRM, testType: currentTestType, score: totalScore, answers, createdAt: serverTimestamp(), createdBy: userId, clinicId };
+    
+    try {
+        await addDoc(collection(db, collectionPath), resultData);
+        showToast("Hasil kuesioner berhasil disimpan!", "success");
+        const maxScore = appData.questionnaire.questions.length * 2;
+        displayResults(totalScore, maxScore);
+    } catch (err) {
+        console.error("Error saving questionnaire: ", err);
+        showToast("Gagal menyimpan hasil.", "error");
+    }
+}
+
+function listenForPatientUpdates() {
+    if (!userId || !clinicId) return; 
+    const collectionPath = `clinics/${clinicId}/patients`;
+    const q = query(collection(db, collectionPath));
+    
+    const tableBody = document.getElementById('patient-table-body');
+    if (tableBody) tableBody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding: 20px;"><i class="fas fa-spinner fa-spin"></i> Memuat data pasien...</td></tr>`;
+    
+    onSnapshot(q, snapshot => {
+        // PERUBAHAN: Menyimpan semua data pasien ke variabel global
+        allPatientsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        
+        // Hanya render pasien aktif di tabel dasbor utama
+        const activePatients = allPatientsData.filter(p => p.status === 'aktif' && p.surgeryFinishTime);
+        renderPatientTable(activePatients.sort((a,b) => getSecondsFromTS(b.surgeryFinishTime) - getSecondsFromTS(a.surgeryFinishTime)));
+
+    }, error => {
+        console.error("Error listening to patient updates:", error);
+        showToast("Gagal memuat data pasien.", "error");
+        if (tableBody) tableBody.innerHTML = `<tr><td colspan="8" style="text-align:center; color: var(--color-error); padding: 20px;"><i class="fas fa-exclamation-triangle"></i> Gagal memuat data.</td></tr>`;
+    });
+}
+
+// PERUBAHAN: Fungsi baru untuk mengambil data kuesioner
+function listenForQuestionnaireUpdates() {
+    if (!userId || !clinicId) return;
+    const collectionPath = `clinics/${clinicId}/questionnaires`;
+    const q = query(collection(db, collectionPath));
+    onSnapshot(q, snapshot => {
+        questionnaireData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    }, error => {
+        console.error("Error listening to questionnaire updates:", error);
+        showToast("Gagal memuat data kuesioner.", "error");
+    });
+}
+
+
+async function saveNewPatient() {
+    if(!userId || !clinicId) return showToast("Koneksi ke database belum siap.", "error");
+    const name = document.getElementById('patient-name').value;
+    const rm = document.getElementById('patient-rm').value;
+    const finishTimeValue = document.getElementById('patient-finish-time').value;
+    const selectedNurse = document.getElementById('current-nurse-selector').value;
+    
+    if (!name || !rm || !finishTimeValue) return showToast("Harap lengkapi data pasien.", "error");
+    if (!selectedNurse) return showToast("Pilih nama perawat terlebih dahulu.", "warning");
+
+    const initialObservation = {
+        mobilityLevel: parseInt(document.getElementById('initial-mobility').value),
+        painScale: 0,
+        ponv: document.getElementById('initial-ponv').value,
+        rass: document.getElementById('initial-rass').value,
+        notes: 'Data awal pasien.',
+        nurse: selectedNurse
+    };
+    
+    const newPatient = {
+        name, rm, 
+        operation: document.getElementById('patient-operation').value,
+        anesthesia: document.getElementById('patient-anesthesia').value,
+        surgeryFinishTime: new Date(finishTimeValue),
+        createdAt: serverTimestamp(),
+        status: 'aktif',
+        clinicId: clinicId,
+        createdBy: userId,
+    };
+
+    try {
+        const collectionPath = `clinics/${clinicId}/patients`;
+        const patientRef = await addDoc(collection(db, collectionPath), newPatient);
+        await addObservationToPatient(patientRef.id, initialObservation);
+        showToast("Pasien baru ditambahkan.", "success");
+        closePatientModal();
+    } catch (error) { 
+        console.error("Error adding patient:", error);
+        showToast("Gagal menambahkan pasien.", "error"); 
+    }
+}
+
+async function savePatientUpdate(e) {
+    if(!userId || !clinicId) return showToast("Koneksi ke database belum siap.", "error");
+    const patientId = e.target.dataset.id;
+    const selectedNurse = document.getElementById('current-nurse-selector').value;
+    if(!selectedNurse) return showToast("Pilih nama perawat terlebih dahulu.", "warning");
+    const newObservation = {
+        mobilityLevel: parseInt(document.getElementById('update-mobility').value),
+        painScale: document.getElementById('update-pain').value,
+        ponv: document.getElementById('update-ponv').value,
+        rass: document.getElementById('update-rass').value,
+        notes: document.getElementById('update-notes').value,
+        nurse: selectedNurse,
+        updatedBy: userId
+    };
+    try {
+        await addObservationToPatient(patientId, newObservation);
+        showToast("Observasi berhasil diperbarui.", "success");
+        closePatientModal();
+    } catch (error) { 
+        console.error("Error updating patient:", error);
+        showToast("Gagal memperbarui data.", "error"); 
     }
 }
 
 async function dischargePatient(patientId) {
-    try {
-        const patientRef = doc(db, clinicPatients.path, patientId);
-        await updateDoc(patientRef, {
-            status: 'pulang',
-            tanggalPulang: serverTimestamp()
+    if(!userId || !clinicId) return showToast("Koneksi ke database belum siap.", "error");
+    showConfirmationDialog("Apakah Anda yakin ingin menandai pasien ini sebagai 'Pulang'? Pasien akan diarsipkan dari dasbor utama.", async () => {
+        try {
+            const docPath = `clinics/${clinicId}/patients/${patientId}`;
+            const patientRef = doc(db, docPath);
+            await updateDoc(patientRef, {
+                status: 'diarsipkan',
+                dischargedAt: serverTimestamp()
+            });
+            showToast("Pasien telah diarsipkan.", "success");
+        } catch (error) {
+            console.error("Error discharging patient:", error);
+            showToast("Gagal mengarsipkan pasien.", "error");
+        }
+    });
+}
+
+async function deletePatient(patientId) {
+    if (!userId || !clinicId) return showToast("Koneksi ke database belum siap.", "error");
+    
+    showConfirmationDialog("Apakah Anda yakin ingin MENGHAPUS data pasien ini secara permanen? Aksi ini tidak bisa dibatalkan.", async () => {
+        try {
+            const docPath = `clinics/${clinicId}/patients/${patientId}`;
+            await deleteDoc(doc(db, docPath));
+            showToast("Data pasien berhasil dihapus.", "success");
+        } catch (error) {
+            console.error("Error deleting patient:", error);
+            showToast("Gagal menghapus data pasien.", "error");
+        }
+    });
+}
+
+
+// --- FUNGSI UTILITAS & RENDER ---
+
+function getSecondsFromTS(ts) {
+    if (!ts) return 0;
+    if (typeof ts === 'object' && ts.seconds !== undefined) return ts.seconds;
+    if (ts && typeof ts.toDate === 'function') return Math.floor(ts.toDate().getTime()/1000);
+    if (ts instanceof Date) return Math.floor(ts.getTime()/1000);
+    if (!isNaN(Number(ts))) return Number(ts);
+    return Math.floor(new Date(ts).getTime()/1000);
+}
+
+function formatElapsedTime(timestamp) {
+    const seconds = Math.floor((Date.now() - timestamp) / 1000);
+    if (seconds < 60) return `< 1 mnt`;
+    const days = Math.floor(seconds / 86400);
+    const hours = Math.floor((seconds % 86400) / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    let result = '';
+    if (days > 0) result += `${days} hari `;
+    if (hours > 0) result += `${hours} jam `;
+    if (minutes > 0) result += `${minutes} mnt`;
+    return result.trim() || 'Baru saja';
+}
+
+let currentTestType = 'pretest';
+
+function setupEventListeners() {
+    document.querySelector('.nav-list').addEventListener('click', e => {
+        const navItem = e.target.closest('.nav-item');
+        if (navItem) navigateToPage(navItem.dataset.page);
+    });
+    document.querySelector('.menu-grid').addEventListener('click', e => {
+        const menuCard = e.target.closest('.menu-card');
+        if (menuCard) navigateToPage(menuCard.dataset.page);
+    });
+    const questionnairePage = document.getElementById('questionnaire-page');
+    if (questionnairePage) {
+        questionnairePage.querySelector('.test-selector').addEventListener('click', e => {
+            const testBtn = e.target.closest('.test-btn');
+            if (testBtn) setActiveTest(testBtn.dataset.test);
         });
-        showToast('success', 'Pasien telah ditandai sudah pulang.');
-    } catch (error) {
-        console.error("Error discharging patient:", error);
-        showToast('error', 'Gagal memperbarui status pasien.');
+        document.getElementById('questionnaire-form').addEventListener('submit', handleQuestionnaireSubmit);
+        questionnairePage.querySelector('.reset-btn').addEventListener('click', resetQuestionnaire);
+        questionnairePage.querySelector('.retry-btn').addEventListener('click', resetQuestionnaire);
+    }
+    const addPatientBtn = document.getElementById('add-patient-btn');
+    if (addPatientBtn) {
+        addPatientBtn.addEventListener('click', () => openPatientModal());
+    }
+    document.body.addEventListener('click', e => {
+        if (e.target.closest('.update-patient-btn')) {
+            const patientId = e.target.closest('.update-patient-btn').dataset.id;
+            openPatientModal(patientId);
+        }
+        if (e.target.closest('.discharge-patient-btn')) {
+            const patientId = e.target.closest('.discharge-patient-btn').dataset.id;
+            dischargePatient(patientId);
+        }
+        if (e.target.closest('.delete-patient-btn')) {
+            const patientId = e.target.closest('.delete-patient-btn').dataset.id;
+            deletePatient(patientId);
+        }
+        if (e.target.matches('.modal-close-btn') || e.target.matches('.modal-overlay')) {
+            if(!document.getElementById('clinic-id-modal').classList.contains('hidden')) return;
+            closePatientModal();
+        }
+    });
+}
+
+function navigateToPage(pageId) {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    const page = document.getElementById(`${pageId}-page`);
+    if(page) page.classList.add('active');
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.page === pageId));
+
+    // PERUBAHAN: Trigger render analisis jika halaman analisis yang dibuka
+    if (pageId === 'analysis') {
+        renderGlobalAnalysis();
     }
 }
 
-// --- FUNGSI TAMPILAN (UI) ---
-function displayPatients(patients) {
-    tableBody.innerHTML = '';
+function setActiveTest(testType) {
+    currentTestType = testType;
+    document.querySelectorAll('.test-btn').forEach(btn => {
+        const isActive = btn.dataset.test === testType;
+        btn.classList.toggle('active', isActive);
+        btn.classList.toggle('btn--primary', isActive);
+        btn.classList.toggle('btn--secondary', !isActive);
+    });
+    document.getElementById('test-mode-indicator').textContent = `Mode: ${testType === 'pretest' ? 'Pre-Test' : 'Post-Test'}`;
+    resetQuestionnaire();
+}
+
+function generateQuestionnaire() {
+    const container = document.getElementById('questions-container');
+    if(!container) return;
+    container.innerHTML = appData.questionnaire.questions.map((q, i) => `
+        <div class="question-item">
+            <p>${i + 1}. ${q.text}</p>
+            <div class="form-group-options">
+                <label class="option-label"><input type="radio" name="q_${q.id}" value="setuju" required> Setuju</label>
+                <label class="option-label"><input type="radio" name="q_${q.id}" value="ragu"> Ragu-ragu</label>
+                <label class="option-label"><input type="radio" name="q_${q.id}" value="tidak_setuju"> Tidak Setuju</label>
+            </div>
+        </div>`).join('');
+}
+
+function displayResults(score, maxScore) {
+    document.getElementById('questionnaire-form').classList.add('hidden');
+    const resultsContainer = document.getElementById('results-container');
+    resultsContainer.classList.remove('hidden');
+    document.getElementById('score-display').textContent = score;
+    const interpEl = document.getElementById('interpretation');
+    let interp;
+    if (score >= maxScore * 0.75) interp = { text: "Pengetahuan & Kondisi Baik", class: "good" };
+    else if (score >= maxScore * 0.5) interp = { text: "Pengetahuan & Kondisi Cukup", class: "fair" };
+    else interp = { text: "Pengetahuan & Kondisi Kurang", class: "poor" };
+    interpEl.innerHTML = `<h4>${interp.text}</h4>`;
+    interpEl.className = `interpretation ${interp.class}`;
+}
+
+function resetQuestionnaire() {
+    document.getElementById('questionnaire-form').reset();
+    document.getElementById('questionnaire-form').classList.remove('hidden');
+    document.getElementById('results-container').classList.add('hidden');
+}
+
+function displayMobilityScaleInfo() {
+    const container = document.getElementById('mobility-scale-info');
+    if (!container) return;
+    container.innerHTML = appData.mobilityScale.map(level => `
+        <div class="mobility-level-item">
+            <span class="status status-level-${level.level}">Level ${level.level}</span>
+            <p><strong>${level.name}:</strong> ${level.description}</p>
+        </div>
+    `).join('');
+}
+
+function populateNurseSelector() {
+    const selector = document.getElementById('current-nurse-selector');
+    if(!selector) return;
+    selector.innerHTML = `<option value="">-- Pilih Perawat --</option>` + appData.nurses.sort().map(nurse => `<option value="${nurse}">${nurse}</option>`).join('');
+}
+
+function renderPatientTable(patients) {
+    const tableBody = document.getElementById('patient-table-body');
+    if (!tableBody) return;
     if (patients.length === 0) {
-        tableBody.innerHTML = `<tr><td colspan="7" style="text-align: center;">Belum ada data pasien. Klik 'Tambah Pasien' untuk memulai.</td></tr>`;
+        tableBody.innerHTML = `<tr class="no-data-row"><td colspan="8">Belum ada data pasien aktif. Klik 'Tambah Pasien Baru' untuk memulai.</td></tr>`;
         return;
     }
-    
-    // Urutkan pasien: yang masih dirawat di atas
-    patients.sort((a, b) => {
-        if (a.status === 'pulang' && b.status !== 'pulang') return 1;
-        if (a.status !== 'pulang' && b.status === 'pulang') return -1;
-        return (b.createdAt?.toDate() || 0) - (a.createdAt?.toDate() || 0);
-    });
+    tableBody.innerHTML = patients.map(p => {
+        const latestObs = p.latestObservation || { ponv: 'N/A', rass: 'N/A', mobilityLevel: 1, createdAt: { seconds: getSecondsFromTS(p.createdAt) } };
+        const idealMobility = calculateIdealMobility(p, latestObs);
+        const suggestion = generateActionSuggestion(latestObs, idealMobility);
+        const finishSeconds = getSecondsFromTS(p.surgeryFinishTime);
+        return `
+            <tr>
+                <td><strong>${p.name}</strong><br><small>${p.rm}</small></td>
+                <td>${p.operation}</td>
+                <td>${p.anesthesia}</td>
+                <td class="post-op-time" data-timestamp="${finishSeconds}">${formatElapsedTime(finishSeconds * 1000)}</td>
+                <td>${latestObs.ponv} / ${latestObs.rass}</td>
+                <td><span class="status status-level-${latestObs.mobilityLevel}">Level ${latestObs.mobilityLevel}</span></td>
+                <td><span class="status status-level-${idealMobility.level}">${idealMobility.text}</span></td>
+                <td>
+                    <div class="suggestion-text">${suggestion}</div>
+                    <div class="action-buttons">
+                        <button class="btn btn--primary btn--sm update-patient-btn" data-id="${p.id}"><i class="fas fa-edit"></i> Update</button>
+                        <button class="btn btn--success btn--sm discharge-patient-btn" data-id="${p.id}"><i class="fas fa-check-circle"></i> Pulang</button>
+                        <button class="btn btn--danger btn--sm delete-patient-btn" data-id="${p.id}"><i class="fas fa-trash-alt"></i> Hapus</button>
+                    </div>
+                </td>
+            </tr>`;
+    }).join('');
+}
 
-    patients.forEach(patient => {
-        const row = document.createElement('tr');
-        if (patient.status === 'pulang') {
-            row.style.opacity = '0.6';
-            row.style.backgroundColor = '#f8f9fa';
+function calculateIdealMobility(patient, latestObs) {
+    const hoursPostOp = (Date.now() - (getSecondsFromTS(patient.surgeryFinishTime) * 1000)) / (3600 * 1000);
+    const majorOperations = ["Laparotomy", "ORIF"];
+    const isMajorOp = majorOperations.includes(patient.operation);
+    
+    if (latestObs.ponv !== 'Tidak Ada' || latestObs.rass !== 'Sadar & Tenang') {
+        return { level: 1, text: `Level 1 (Atasi ${latestObs.ponv !== 'Tidak Ada' ? 'PONV' : 'RASS'})` };
+    }
+    
+    if (patient.anesthesia === "Spinal Anesthesia" && hoursPostOp < 8) {
+        return { level: 2, text: "Level 2 (Post-Spinal)" };
+    }
+    
+    if (isMajorOp) {
+        if (hoursPostOp < 6) return { level: 1, text: "Level 1" };
+        if (hoursPostOp >= 6 && hoursPostOp < 12) return { level: 2, text: "Level 2" };
+        if (hoursPostOp >= 12 && hoursPostOp < 24) return { level: 3, text: "Level 3" };
+        if (hoursPostOp >= 24 && hoursPostOp < 48) return { level: 5, text: "Level 5" };
+        if (hoursPostOp >= 48 && hoursPostOp < 72) return { level: 6, text: "Level 6" };
+        return { level: 7, text: "Level 7" };
+    } else {
+        if (hoursPostOp < 4) return { level: 2, text: "Level 2" };
+        if (hoursPostOp >= 4 && hoursPostOp < 8) return { level: 3, text: "Level 3" };
+        if (hoursPostOp >= 8 && hoursPostOp < 18) return { level: 5, text: "Level 5" };
+        if (hoursPostOp >= 18 && hoursPostOp < 36) return { level: 6, text: "Level 6" };
+        return { level: 7, text: "Level 7" };
+    }
+}
+
+function generateActionSuggestion(latestObs, idealMobility) {
+    const currentLevel = latestObs.mobilityLevel;
+    const idealLevel = idealMobility.level;
+    
+    if (latestObs.ponv !== 'Tidak Ada') return '<strong>Prioritas:</strong> Atasi mual/muntah (PONV) sesuai advise DPJP.';
+    if (latestObs.rass !== 'Sadar & Tenang') return '<strong>Prioritas:</strong> Stabilkan kesadaran (RASS). Observasi ketat.';
+    
+    if (currentLevel >= idealLevel) {
+        const nextLevel = appData.mobilityScale.find(s => s.level === currentLevel + 1);
+        if (nextLevel) {
+            return `<strong>Pertahankan!</strong> Target tercapai. Dorong ke <strong>${nextLevel.name}</strong> jika kondisi memungkinkan.`;
         }
+        return '<strong>Luar Biasa!</strong> Pasien sangat aktif. Pertahankan dan monitor kenyamanan.';
+    } else {
+        const targetAction = appData.mobilityScale.find(s => s.level === idealLevel);
+        const currentAction = appData.mobilityScale.find(s => s.level === currentLevel);
         
-        const pod = calculatePod(patient.waktuSelesaiOperasi);
-        const { suggestion, target } = getSuggestionForPatient(patient, pod);
+        const currentActionName = currentAction ? currentAction.name : 'Level Saat Ini';
+        const targetActionName = targetAction ? targetAction.name : 'Target Berikutnya';
+
+        return `<strong>Ayo Kejar!</strong> Pasien masih di <strong>${currentActionName}</strong>. Target selanjutnya: <strong>${targetActionName}</strong>.`;
+    }
+}
+
+function openPatientModal(patientId = null) {
+    const isEditing = patientId !== null;
+    const patient = isEditing ? allPatientsData.find(p => p.id === patientId) : null;
+    document.getElementById('modal-title').textContent = isEditing ? 'Update Observasi Pasien' : 'Tambah Pasien Baru';
+    const modalBody = document.getElementById('modal-body');
+    
+    const addForm = `
+        <div class="modal-grid">
+            <div class="form-group"><label for="patient-name">Nama Pasien</label><input type="text" id="patient-name" class="form-control" required></div>
+            <div class="form-group"><label for="patient-rm">Nomor RM</label><input type="text" id="patient-rm" class="form-control" required></div>
+            <div class="form-group full-width"><label for="patient-operation">Jenis Operasi</label><select id="patient-operation" class="form-control">${appData.operations.map(op=>`<option>${op}</option>`).join('')}</select></div>
+            <div class="form-group full-width"><label for="patient-anesthesia">Jenis Anestesi</label><select id="patient-anesthesia" class="form-control">${appData.anesthesiaTypes.map(an=>`<option>${an}</option>`).join('')}</select></div>
+            <div class="form-group full-width"><label for="patient-finish-time">Waktu Selesai Operasi</label><input type="datetime-local" id="patient-finish-time" class="form-control" required></div>
+        </div>
+        <hr class="form-divider">
+        <h4>Observasi Awal</h4>
+        <div class="modal-grid">
+            <div class="form-group"><label>Mual/Muntah (PONV)</label><select id="initial-ponv" class="form-control"><option>Tidak Ada</option><option>Ringan</option><option>Berat</option></select></div>
+            <div class="form-group"><label>Tingkat Kesadaran (RASS)</label><select id="initial-rass" class="form-control"><option>Sadar & Tenang</option><option>Mengantuk</option><option>Respon suara</option><option>Tak ada respon</option></select></div>
+            <div class="form-group full-width"><label>Mobilisasi Awal (JH-HLM)</label><select id="initial-mobility" class="form-control">${appData.mobilityScale.map(s=>`<option value="${s.level}">${s.name}</option>`).join('')}</select></div>
+        </div>
+        <div class="modal-footer"><button class="btn btn--primary" id="save-new-patient-btn">Simpan Pasien</button></div>`;
         
-        row.innerHTML = `
-            <td data-label="Nama Pasien">${patient.namaPasien || '-'}</td>
-            <td data-label="No. RM">${patient.noRm || '-'}</td>
-            <td data-label="Jenis Operasi">${patient.jenisOperasi || '-'}</td>
-            <td data-label="Level Mobilisasi">${patient.levelMobilisasi} (Target: ${target})</td>
-            <td data-label="Hari Rawat">${pod}</td>
-            <td data-label="Saran / Target">${suggestion}</td>
-            <td data-label="Aksi">
-                <div class="action-buttons">
-                    <button class="btn btn--icon btn--secondary" data-action="update" data-id="${patient.id}" title="Update Data" ${patient.status === 'pulang' ? 'disabled' : ''}><i class="fas fa-edit"></i><span>Update</span></button>
-                    <button class="btn btn--icon btn--danger" data-action="delete" data-id="${patient.id}" title="Hapus Pasien"><i class="fas fa-trash"></i><span>Hapus</span></button>
-                    <button class="btn btn--icon btn--success" data-action="discharge" data-id="${patient.id}" title="Pasien Pulang" ${patient.status === 'pulang' ? 'disabled' : ''}><i class="fas fa-hospital-user"></i><span>Pulang</span></button>
+    const updateForm = `
+        <h4>Pasien: ${patient?.name} (${patient?.rm})</h4><hr class="form-divider">
+        <div class="modal-grid">
+            <div class="form-group full-width"><label>Update Skala Mobilitas (JH-HLM)</label><select id="update-mobility" class="form-control">${appData.mobilityScale.map(s=>`<option value="${s.level}">${s.name}</option>`).join('')}</select></div>
+            <div class="form-group"><label>Skala Nyeri (0-10)</label><input type="number" id="update-pain" class="form-control" min="0" max="10" value="0"></div>
+            <div class="form-group"><label>Mual/Muntah (PONV)</label><select id="update-ponv" class="form-control"><option>Tidak Ada</option><option>Ringan</option><option>Berat</option></select></div>
+            <div class="form-group"><label>Tingkat Kesadaran (RASS)</label><select id="update-rass" class="form-control"><option>Sadar & Tenang</option><option>Mengantuk</option><option>Respon suara</option><option>Tak ada respon</option></select></div>
+            <div class="form-group full-width"><label>Catatan Tambahan</label><textarea id="update-notes" class="form-control" rows="2"></textarea></div>
+        </div>
+        <div class="modal-footer"><button class="btn btn--primary" id="save-update-btn" data-id="${patientId}">Simpan Observasi</button></div>`;
+        
+    modalBody.innerHTML = isEditing ? updateForm : addForm;
+
+    if (isEditing) {
+        const latestObs = patient.latestObservation || {};
+        document.getElementById('update-mobility').value = latestObs.mobilityLevel || 1;
+        document.getElementById('update-pain').value = latestObs.painScale || 0;
+        document.getElementById('update-ponv').value = latestObs.ponv || 'Tidak Ada';
+        document.getElementById('update-rass').value = latestObs.rass || 'Sadar & Tenang';
+        document.getElementById('save-update-btn').addEventListener('click', savePatientUpdate);
+    } else {
+        const now = new Date();
+        now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+        document.getElementById('patient-finish-time').value = now.toISOString().slice(0, 16);
+        document.getElementById('save-new-patient-btn').addEventListener('click', saveNewPatient);
+    }
+    
+    document.getElementById('patient-modal').classList.remove('hidden');
+}
+
+function closePatientModal() {
+    document.getElementById('patient-modal').classList.add('hidden');
+}
+
+function startRealtimeClocks() {
+    const updateTimes = () => {
+        document.querySelectorAll('.post-op-time').forEach(el => {
+            const timestamp = parseInt(el.dataset.timestamp, 10);
+            if (!isNaN(timestamp)) {
+               el.textContent = formatElapsedTime(timestamp * 1000);
+            }
+        });
+    };
+    setInterval(updateTimes, 1000 * 30);
+    updateTimes();
+}
+
+// --- FUNGSI ANALISIS BARU ---
+
+function renderGlobalAnalysis() {
+    renderQuestionnaireAnalysis(questionnaireData);
+    renderPatientDashboardAnalysis(allPatientsData);
+}
+
+function renderQuestionnaireAnalysis(data) {
+    const container = document.getElementById('questionnaire-analysis-container');
+    if (!data || data.length === 0) {
+        container.innerHTML = `<div class="info-card"><p>Belum ada data kuesioner yang cukup untuk dianalisis.</p></div>`;
+        return;
+    }
+
+    const preTests = data.filter(d => d.testType === 'pretest');
+    const postTests = data.filter(d => d.testType === 'posttest');
+
+    const avgPreScore = preTests.length > 0 ? (preTests.reduce((sum, d) => sum + d.score, 0) / preTests.length) : 0;
+    const avgPostScore = postTests.length > 0 ? (postTests.reduce((sum, d) => sum + d.score, 0) / postTests.length) : 0;
+    const improvement = avgPreScore > 0 ? ((avgPostScore - avgPreScore) / avgPreScore) * 100 : 0;
+
+    container.innerHTML = `
+        <div class="analysis-grid">
+            <div class="stat-card">
+                <div class="stat-icon"><i class="fas fa-question-circle"></i></div>
+                <div class="stat-content">
+                    <div class="stat-value">${avgPreScore.toFixed(1)}</div>
+                    <div class="stat-label">Rata-rata Skor Pre-Test</div>
                 </div>
-            </td>
-        `;
-        tableBody.appendChild(row);
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon"><i class="fas fa-check-circle"></i></div>
+                <div class="stat-content">
+                    <div class="stat-value">${avgPostScore.toFixed(1)}</div>
+                    <div class="stat-label">Rata-rata Skor Post-Test</div>
+                </div>
+            </div>
+            <div class="stat-card success">
+                <div class="stat-icon"><i class="fas fa-arrow-up"></i></div>
+                <div class="stat-content">
+                    <div class="stat-value">${improvement.toFixed(0)}%</div>
+                    <div class="stat-label">Peningkatan Pemahaman</div>
+                </div>
+            </div>
+        </div>
+        <div class="chart-container" style="margin-top: 24px;">
+            <h4>Perbandingan Skor Rata-rata Pre vs. Post Test</h4>
+            <canvas id="q-comparison-chart"></canvas>
+        </div>
+        <div class="interpretation-card">
+            <h4>Interpretasi</h4>
+            <p>Data menunjukkan adanya <strong>peningkatan pemahaman pasien sebesar ${improvement.toFixed(0)}%</strong> setelah mendapatkan edukasi melalui leaflet dan video. Skor rata-rata yang lebih tinggi pada post-test mengindikasikan bahwa intervensi yang diberikan efektif dalam meningkatkan pengetahuan pasien mengenai pentingnya mobilisasi dini.</p>
+        </div>
+    `;
+
+    const chartData = {
+        labels: ['Pre-Test', 'Post-Test'],
+        datasets: [{
+            label: 'Skor Rata-rata',
+            data: [avgPreScore, avgPostScore],
+            backgroundColor: ['rgba(230, 129, 97, 0.7)', 'rgba(41, 150, 161, 0.7)'],
+            borderColor: ['rgba(230, 129, 97, 1)', 'rgba(41, 150, 161, 1)'],
+            borderWidth: 1
+        }]
+    };
+    renderChart('q-comparison-chart', 'bar', chartData, { scales: { y: { beginAtZero: true, max: 20 } } });
+}
+
+function renderPatientDashboardAnalysis(data) {
+    const container = document.getElementById('patient-analysis-container');
+    const dischargedPatients = data.filter(p => p.status === 'diarsipkan' && p.dischargedAt && p.surgeryFinishTime);
+
+    if (dischargedPatients.length === 0) {
+        container.innerHTML = `<div class="info-card"><p>Belum ada data pasien pulang yang cukup untuk dianalisis.</p></div>`;
+        return;
+    }
+
+    // 1. Rata-rata Lama Rawat (Length of Stay)
+    const totalStayHours = dischargedPatients.reduce((sum, p) => {
+        const stay = getSecondsFromTS(p.dischargedAt) - getSecondsFromTS(p.surgeryFinishTime);
+        return sum + (stay / 3600); // in hours
+    }, 0);
+    const avgStayHours = (totalStayHours / dischargedPatients.length).toFixed(1);
+
+    // 2. Distribusi Level Mobilisasi Saat Pulang
+    const mobilityAtDischargeCounts = appData.mobilityScale.map(level => {
+        return dischargedPatients.filter(p => p.latestObservation?.mobilityLevel === level.level).length;
+    });
+
+    container.innerHTML = `
+        <div class="analysis-grid">
+            <div class="stat-card">
+                <div class="stat-icon"><i class="fas fa-hospital-user"></i></div>
+                <div class="stat-content">
+                    <div class="stat-value">${dischargedPatients.length}</div>
+                    <div class="stat-label">Total Pasien Pulang</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon"><i class="fas fa-clock"></i></div>
+                <div class="stat-content">
+                    <div class="stat-value">${avgStayHours}</div>
+                    <div class="stat-label">Rata-rata Jam Rawat Post-OP</div>
+                </div>
+            </div>
+            <div class="chart-container full-width">
+                <h4>Distribusi Level Mobilisasi Pasien Saat Pulang</h4>
+                <canvas id="discharge-mobility-chart"></canvas>
+            </div>
+        </div>
+         <div class="interpretation-card">
+            <h4>Interpretasi</h4>
+            <p>Dari <strong>${dischargedPatients.length}</strong> pasien yang telah pulang, rata-rata lama perawatan pasca operasi adalah <strong>${avgStayHours} jam</strong>. Grafik di atas menunjukkan kapabilitas mobilisasi pasien pada saat mereka dinyatakan boleh pulang. Mayoritas pasien mencapai level mobilisasi tinggi, yang menandakan keberhasilan program dalam memfasilitasi pemulihan fungsional pasien.</p>
+        </div>
+    `;
+
+    const chartData = {
+        labels: appData.mobilityScale.map(l => `Level ${l.level}`),
+        datasets: [{
+            label: 'Jumlah Pasien',
+            data: mobilityAtDischargeCounts,
+            backgroundColor: 'rgba(33, 128, 141, 0.6)',
+            borderColor: 'rgba(33, 128, 141, 1)',
+            borderWidth: 1,
+            borderRadius: 4,
+        }]
+    };
+    renderChart('discharge-mobility-chart', 'bar', chartData, { indexAxis: 'y', scales: { x: { beginAtZero: true, ticks: { stepSize: 1 } } } });
+}
+
+function renderChart(canvasId, type, data, options = {}) {
+    const ctx = document.getElementById(canvasId).getContext('2d');
+    if (chartInstances[canvasId]) {
+        chartInstances[canvasId].destroy();
+    }
+    chartInstances[canvasId] = new Chart(ctx, {
+        type: type,
+        data: data,
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            ...options
+        }
     });
 }
 
-
-function openPatientModal(patient = null) {
-    modalTitle.textContent = patient ? 'Update Data Pasien' : 'Tambah Pasien Baru';
-    
-    const fields = [
-        { id: 'namaPasien', label: 'Nama Pasien', type: 'text' },
-        { id: 'noRm', label: 'No. Rekam Medis', type: 'text' },
-        { id: 'waktuSelesaiOperasi', label: 'Waktu Selesai Operasi', type: 'datetime-local' }, // PERUBAHAN
-        { id: 'jenisOperasi', label: 'Jenis Operasi', type: 'select', options: appData.operations },
-        { id: 'jenisAnestesi', label: 'Jenis Anestesi', type: 'select', options: appData.anesthesiaTypes },
-        { id: 'levelMobilisasi', label: 'Level Mobilisasi Saat Ini', type: 'select', options: appData.mobilizationLevels },
-        { id: 'perawat', label: 'Perawat Penanggung Jawab', type: 'select', options: appData.nurses }
-    ];
-
-    let formHtml = '<form id="patient-form" class="modal-grid">';
-    fields.forEach(field => {
-        let value = patient ? (patient[field.id] || '') : '';
-        if (field.id === 'waktuSelesaiOperasi' && patient && patient[field.id]) {
-            const date = patient[field.id].toDate();
-            value = new Date(date.getTime() - (date.getTimezoneOffset() * 60000)).toISOString().slice(0, 16);
-        }
-
-        formHtml += `<div class="form-group ${field.id === 'namaPasien' || field.id === 'noRm' ? '' : ''}">
-                        <label for="${field.id}" class="form-label">${field.label}</label>`;
-        if (field.type === 'select') {
-            formHtml += `<select id="${field.id}" class="form-control">`;
-            field.options.forEach(opt => {
-                formHtml += `<option value="${opt}" ${opt == value ? 'selected' : ''}>${opt}</option>`;
-            });
-            formHtml += `</select>`;
-        } else {
-            formHtml += `<input type="${field.type}" id="${field.id}" class="form-control" value="${value}">`;
-        }
-        formHtml += `</div>`;
-    });
-    formHtml += `</form>
-                 <div class="modal-footer">
-                    <button id="save-patient-btn" class="btn btn--primary">Simpan Data</button>
-                 </div>`;
-
-    modalBody.innerHTML = formHtml;
-    document.getElementById('save-patient-btn').onclick = () => {
-        const patientData = {};
-        fields.forEach(field => {
-            patientData[field.id] = document.getElementById(field.id).value;
-        });
-        savePatient(patient ? patient.id : null, patientData);
-    };
-
-    modal.classList.remove('hidden');
-    modal.style.opacity = '1';
-}
-
-function closeModal() {
-    modal.style.opacity = '0';
-    setTimeout(() => modal.classList.add('hidden'), 300);
-}
-
-function handleTableActions(event) {
-    const button = event.target.closest('button[data-action]');
-    if (!button) return;
-
-    const action = button.dataset.action;
-    const id = button.dataset.id;
-    const patient = allPatientsData.find(p => p.id === id);
-
-    if (action === 'update') {
-        openPatientModal(patient);
-    } else if (action === 'delete') {
-        showConfirmationDialog(`Anda yakin ingin menghapus data pasien "${patient.namaPasien}"? Tindakan ini tidak dapat dibatalkan.`, () => {
-            deletePatient(id);
-        });
-    } else if (action === 'discharge') {
-        showConfirmationDialog(`Anda yakin ingin menandai pasien "${patient.namaPasien}" sudah pulang?`, () => {
-            dischargePatient(id);
-        });
-    }
-}
-
-// --- FUNGSI UTILITAS & HELPER ---
-
-function calculatePod(timestamp) {
-    if (!timestamp || !timestamp.toDate) return 'N/A';
-    const opDate = timestamp.toDate();
-    const now = new Date();
-    const diffTime = Math.abs(now - opDate);
-    return Math.floor(diffTime / (1000 * 60 * 60 * 24));
-}
-
-// PERUBAHAN: Logika baru untuk mendapatkan saran
-function getSuggestionForPatient(patient, pod) {
-    if (pod === 'N/A') {
-        return { suggestion: 'Lengkapi data waktu selesai operasi.', target: 'N/A' };
-    }
-
-    let suggestions = [];
-    let targetLevel = 'N/A';
-
-    const podFactor = mobilizationFactors.pod.find(f => f.day == pod) || mobilizationFactors.pod[mobilizationFactors.pod.length - 1];
-    if (podFactor) {
-        suggestions.push(`<b>POD ${pod}:</b> ${podFactor.suggestion}`);
-        targetLevel = podFactor.level;
-    }
-
-    if (patient.jenisAnestesi && mobilizationFactors.anesthesia[patient.jenisAnestesi]) {
-        suggestions.push(mobilizationFactors.anesthesia[patient.jenisAnestesi]);
-    }
-    
-    return {
-        suggestion: suggestions.join('<br>'),
-        target: targetLevel
-    };
-}
-
-
-function showToast(type, message) {
+function showToast(message, type = 'info') {
     const toast = document.getElementById('toast');
-    const icons = { success: 'fa-solid fa-check-circle', error: 'fa-solid fa-times-circle' };
+    if (!toast) return;
     toast.querySelector('.toast-message').textContent = message;
+    const icons = { success: 'fas fa-check-circle', error: 'fas fa-times-circle', warning: 'fas fa-exclamation-triangle', info: 'fas fa-info-circle' };
     toast.querySelector('.toast-icon').className = `toast-icon ${icons[type]}`;
     toast.className = `toast show ${type}`;
     setTimeout(() => toast.classList.remove('show'), 3000);
@@ -369,11 +762,10 @@ function showToast(type, message) {
 function showConfirmationDialog(message, onConfirm) {
     const existingDialog = document.getElementById('custom-confirm-dialog');
     if (existingDialog) existingDialog.remove();
-    
     const dialog = document.createElement('div');
     dialog.id = 'custom-confirm-dialog';
     dialog.className = 'modal-overlay';
-    dialog.style.cssText = 'opacity: 0; transition: opacity 0.3s;';
+    dialog.style.opacity = '0';
     dialog.innerHTML = `
         <div class="modal-content" style="max-width: 400px;">
             <div class="modal-header"><h3>Konfirmasi Tindakan</h3></div>
@@ -385,96 +777,17 @@ function showConfirmationDialog(message, onConfirm) {
         </div>
     `;
     document.body.appendChild(dialog);
-    setTimeout(() => dialog.style.opacity = '1', 10);
-
+    setTimeout(() => {
+        dialog.classList.remove('hidden');
+        dialog.style.opacity = '1';
+    }, 10);
     const closeDialog = () => {
         dialog.style.opacity = '0';
         setTimeout(() => dialog.remove(), 300);
     };
-
     document.getElementById('confirm-ok').onclick = () => {
         onConfirm();
         closeDialog();
     };
     document.getElementById('confirm-cancel').onclick = closeDialog;
-}
-
-// PERUBAHAN: Fungsi untuk membuat dan merender dashboard
-function initDashboard(patients) {
-    const ctxLevel = document.getElementById('mobilizationLevelChart').getContext('2d');
-    const ctxStatus = document.getElementById('patientStatusChart').getContext('2d');
-    const ctxLos = document.getElementById('losChart').getContext('2d');
-
-    if (mobilizationChart) mobilizationChart.destroy();
-    if (patientStatusChart) patientStatusChart.destroy();
-    if (losChart) losChart.destroy();
-
-    // 1. Grafik Distribusi Level Mobilisasi
-    const levelCounts = Array(7).fill(0);
-    patients.filter(p => p.status !== 'pulang').forEach(p => {
-        if (p.levelMobilisasi >= 0 && p.levelMobilisasi <= 6) {
-            levelCounts[p.levelMobilisasi]++;
-        }
-    });
-
-    mobilizationChart = new Chart(ctxLevel, {
-        type: 'bar',
-        data: {
-            labels: Array.from({ length: 7 }, (_, i) => `Level ${i}`),
-            datasets: [{
-                label: 'Jumlah Pasien Aktif',
-                data: levelCounts,
-                backgroundColor: 'rgba(50, 184, 198, 0.6)',
-                borderColor: 'rgba(50, 184, 198, 1)',
-                borderWidth: 1
-            }]
-        },
-        options: { responsive: true, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
-    });
-
-    // 2. Grafik Status Pasien
-    const statusCounts = { 'Dirawat': 0, 'Pulang': 0 };
-    patients.forEach(p => {
-        if (p.status === 'pulang') statusCounts['Pulang']++;
-        else statusCounts['Dirawat']++;
-    });
-
-    patientStatusChart = new Chart(ctxStatus, {
-        type: 'pie',
-        data: {
-            labels: ['Masih Dirawat', 'Sudah Pulang'],
-            datasets: [{
-                data: [statusCounts['Dirawat'], statusCounts['Pulang']],
-                backgroundColor: ['rgba(255, 159, 64, 0.6)', 'rgba(75, 192, 192, 0.6)'],
-                borderColor: ['rgba(255, 159, 64, 1)', 'rgba(75, 192, 192, 1)'],
-            }]
-        },
-        options: { responsive: true }
-    });
-    
-    // 3. Grafik Rata-rata Lama Rawat (LOS)
-    const dischargedPatients = patients.filter(p => p.status === 'pulang' && p.waktuSelesaiOperasi && p.tanggalPulang);
-    let totalLos = 0;
-    dischargedPatients.forEach(p => {
-        const opDate = p.waktuSelesaiOperasi.toDate();
-        const dischargeDate = p.tanggalPulang.toDate();
-        totalLos += (dischargeDate - opDate) / (1000 * 60 * 60 * 24);
-    });
-    const averageLos = dischargedPatients.length > 0 ? (totalLos / dischargedPatients.length).toFixed(1) : 0;
-
-    losChart = new Chart(ctxLos, {
-        type: 'bar',
-         data: {
-            labels: ['Rata-rata Lama Rawat (Hari)'],
-            datasets: [{
-                label: 'LOS Pasien Pulang',
-                data: [averageLos],
-                backgroundColor: ['rgba(153, 102, 255, 0.6)'],
-                borderColor: ['rgba(153, 102, 255, 1)'],
-                borderWidth: 1,
-                maxBarThickness: 100
-            }]
-        },
-        options: { responsive: true, indexAxis: 'y', scales: { x: { beginAtZero: true, suggestedMax: 10 } } }
-    });
 }

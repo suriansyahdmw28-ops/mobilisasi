@@ -187,6 +187,15 @@ p:last-child { margin-bottom: 0; }
 .section-title { font-size: var(--font-size-xl); margin-bottom: var(--space-8); display: flex; align-items: center; gap: var(--space-8); }
 .section-subtitle { font-size: var(--font-size-base); color: var(--color-text-secondary); margin-bottom: var(--space-24); max-width: 800px; }
 .analysis-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: var(--space-24); }
+/* PERUBAHAN: Grid baru untuk layout analisis yang lebih bervariasi */
+.analysis-grid-varied {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--space-24);
+}
+.analysis-grid-varied .full-span {
+    grid-column: 1 / -1;
+}
 .stat-card { background-color: var(--color-surface); border-radius: var(--radius-lg); padding: var(--space-24); display: flex; align-items: center; gap: var(--space-16); border: 1px solid var(--color-card-border); }
 .stat-card.success { background-color: var(--color-bg-3); border-color: rgba(var(--color-success-rgb), 0.3); }
 .stat-card.success .stat-icon, .stat-card.success .stat-value { color: var(--color-success); }
@@ -219,6 +228,13 @@ p:last-child { margin-bottom: 0; }
 .toast.error .toast-icon { color: var(--color-error); }
 .hidden { display: none !important; }
 
+@media (max-width: 992px) {
+  /* PERUBAHAN: Buat grid analisis menjadi satu kolom di layar tablet */
+  .analysis-grid-varied {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 768px) {
   .nav-item span { display: none; }
   .nav-item { min-width: 60px; justify-content: center;}
@@ -229,3 +245,4 @@ p:last-child { margin-bottom: 0; }
 
 .logo-image { height: 48px; width: auto; object-fit: contain; }
 .hero-logo { max-width: 120px; height: auto; margin-top: var(--space-24); }
+

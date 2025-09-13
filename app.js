@@ -766,7 +766,8 @@ function renderChart(canvasId, type, data, options = {}) {
     }
     const defaultOptions = {
         responsive: true,
-        maintainAspectRatio: false,
+        maintainAspectRatio: true,   // ubah dari false -> true
+        aspectRatio: 2.5,
         plugins: {
             legend: {
                 display: type === 'bar' && options.scales?.x?.stacked, // Only display legend for stacked bar

@@ -3,111 +3,206 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MLQ - Dashboard Mobilisasi Pasien</title>
+    <title>Program MLQ - RSUD Pangeran Jaya Sumitra Kotabaru</title>
     <link rel="stylesheet" href="style.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
-    <!-- (Modal dan Header tetap sama) -->
-
-    <main class="container">
-        <!-- ... Halaman-halaman lain ... -->
-
-        <!-- HALAMAN KUESIONER (DIMODIFIKASI) -->
-        <div id="page-questionnaire" class="page">
-            <div class="page-header">
-                <h2><i class="fas fa-file-alt"></i> Kuesioner Pasien</h2>
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <div class="logo-section">
+                    <img src="https://github.com/suriansyahdmw28-ops/mobilisasi/blob/main/logo%20rs.jpg?raw=true" alt="Logo Rumah Sakit" class="logo-image">
+                    <div class="header-text">
+                        <h1>RSUD Pangeran Jaya Sumitra Kotabaru</h1>
+                        <p>Program MLQ - Mobilisasi Dini Post Operasi</p>
+                    </div>
+                </div>
             </div>
-            
-            <form id="questionnaire-form" class="questionnaire-form">
-                <div class="patient-data-section">
-                    <div class="form-group">
-                        <label for="q-patient-name" class="form-label">Nama Pasien</label>
-                        <input type="text" id="q-patient-name" class="form-control" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="q-patient-rm" class="form-label">Nomor RM</label>
-                        <input type="text" id="q-patient-rm" class="form-control" required>
-                    </div>
-                </div>
-
-                <div class="form-divider"></div>
-
-                <!-- Bagian Kuesioner Pengetahuan -->
-                <h3 class="questionnaire-section-title">Bagian A: Pengetahuan Mobilisasi Dini</h3>
-                <div id="knowledge-questions-container">
-                    <!-- Pertanyaan pengetahuan akan digenerate oleh JS -->
-                </div>
-
-                <div class="form-divider"></div>
-
-                <!-- Bagian Kuesioner PROMIS (BARU) -->
-                <h3 class="questionnaire-section-title">Bagian B: Kondisi yang Anda Rasakan</h3>
-                
-                <div class="promis-section">
-                    <h4>Fungsi Fisik</h4>
-                    <p class="section-instruction">Dalam 7 hari terakhir, seberapa sulit bagi Anda untuk melakukan aktivitas berikut?</p>
-                    <div id="promis-pf-container">
-                        <!-- Pertanyaan PROMIS-PF akan digenerate oleh JS -->
-                    </div>
-                </div>
-
-                <div class="promis-section">
-                    <h4>Gangguan Nyeri</h4>
-                    <p class="section-instruction">Dalam 7 hari terakhir, seberapa sering rasa nyeri mengganggu aktivitas berikut?</p>
-                    <div id="promis-pi-container">
-                        <!-- Pertanyaan PROMIS-PI akan digenerate oleh JS -->
-                    </div>
-                </div>
-
-                <div class="form-actions">
-                    <button type="submit" class="btn btn--primary"><i class="fas fa-save"></i> Simpan Hasil</button>
-                </div>
-            </form>
         </div>
+    </header>
 
-        <!-- HALAMAN DASBOR PASIEN (DIMODIFIKASI) -->
-        <div id="page-dashboard" class="page active">
-             <div class="page-header">
-                <h2><i class="fas fa-tachometer-alt"></i> Dasbor Pasien Post-Operasi</h2>
-                <button id="add-patient-btn" class="btn btn--primary"><i class="fas fa-user-plus"></i> Tambah Pasien Baru</button>
+    <nav class="nav">
+        <div class="container">
+            <div class="nav-list">
+                <button class="nav-item active" data-page="landing"><i class="fas fa-home"></i><span>Beranda</span></button>
+                <button class="nav-item" data-page="leaflet"><i class="fas fa-book-open"></i><span>Leaflet</span></button>
+                <button class="nav-item" data-page="video"><i class="fas fa-play-circle"></i><span>Video</span></button>
+                <button class="nav-item" data-page="questionnaire"><i class="fas fa-clipboard-question"></i><span>Kuesioner</span></button>
+                <button class="nav-item" data-page="observation"><i class="fas fa-tasks"></i><span>Dasbor Pasien</span></button>
             </div>
+        </div>
+    </nav>
 
-            <!-- Panduan Level Mobilisasi (BARU: Diperbarui hingga Level 8) -->
-            <div class="info-card">
-                 <h4><i class="fas fa-shoe-prints"></i> Panduan Level Mobilisasi (0-8)</h4>
-                 <div id="mobility-scale-grid" class="mobility-scale-grid">
-                     <!-- Level mobilisasi akan digenerate oleh JS -->
+    <main class="main">
+        <div class="container">
+            <!-- Landing & Other Pages -->
+            <div id="landing-page" class="page active">
+                <div class="hero">
+                    <div class="hero-content">
+                        <h2>Program MLQ</h2>
+                        <h3>Early Mobilization, Leaflet & Video QR Code</h3>
+                        <img src="https://raw.githubusercontent.com/suriansyahdmw28-ops/mobilisasi/refs/heads/main/logoprogram.png" alt="Logo Program MLQ" class="hero-logo">
+                    </div>
+                </div>
+                <div class="menu-grid">
+                    <div class="menu-card" data-page="leaflet"><div class="menu-icon"><i class="fas fa-book-open"></i></div><h4>Leaflet Digital</h4><p>Panduan lengkap prosedur mobilisasi dini.</p><button class="btn btn--primary btn--sm">Buka Leaflet</button></div>
+                    <div class="menu-card" data-page="video"><div class="menu-icon"><i class="fas fa-play-circle"></i></div><h4>Video Edukasi</h4><p>Demonstrasi visual teknik mobilisasi.</p><button class="btn btn--primary btn--sm">Tonton Video</button></div>
+                    <div class="menu-card" data-page="questionnaire"><div class="menu-icon"><i class="fas fa-clipboard-question"></i></div><h4>Kuesioner</h4><p>Pre-test dan Post-test untuk pasien.</p><button class="btn btn--primary btn--sm">Mulai Kuesioner</button></div>
+                    <div class="menu-card" data-page="observation"><div class="menu-icon"><i class="fas fa-tasks"></i></div><h4>Dasbor Observasi Pasien</h4><p>Monitor kemajuan mobilisasi pasien secara real-time.</p><button class="btn btn--primary btn--sm">Buka Dasbor</button></div>
+                </div>
+            </div>
+            <div id="leaflet-page" class="page"><div class="page-header"><h2>Leaflet Digital - Mobilisasi Dini</h2><a href="leaflet.pdf" download="Leaflet-Mobilisasi-Dini.pdf" class="btn btn--primary btn--sm"><i class="fas fa-download"></i> Download PDF</a></div><div class="leaflet-content"><div class="pdf-viewer-container"><iframe src="leaflet.pdf"></iframe></div></div></div>
+            <div id="video-page" class="page"><div class="page-header"><h2>Video Edukasi</h2></div><div class="video-content"><div class="video-placeholder"><i class="fas fa-play-circle"></i><h3>Video akan segera tersedia.</h3></div></div></div>
+            
+            <!-- Questionnaire Page -->
+            <div id="questionnaire-page" class="page">
+                 <!-- PERUBAHAN: Judul kuesioner disesuaikan -->
+                 <div class="page-header"><h2>Kuesioner Pengetahuan & Kondisi (10 Soal)</h2><span id="test-mode-indicator" class="status status--info">Mode: Pre-Test</span></div>
+                 <div class="questionnaire-content">
+                     <div class="test-selector">
+                         <button class="btn btn--primary test-btn active" data-test="pretest">Pre-Test</button>
+                         <button class="btn btn--secondary test-btn" data-test="posttest">Post-Test</button>
+                     </div>
+                     <div class="questionnaire-form">
+                         <form id="questionnaire-form">
+                             <div class="patient-data-section">
+                                 <div class="form-group">
+                                     <label class="form-label" for="q-patient-name">Nama Pasien</label>
+                                     <input type="text" class="form-control" id="q-patient-name" required>
+                                 </div>
+                                 <div class="form-group">
+                                     <label class="form-label" for="q-patient-rm">Nomor RM</label>
+                                     <input type="text" class="form-control" id="q-patient-rm" required>
+                                 </div>
+                             </div>
+                             <hr class="form-divider">
+                             <div id="questions-container"></div>
+                             <div class="form-actions">
+                                 <button type="submit" class="btn btn--primary"><i class="fas fa-paper-plane"></i> Kirim Jawaban & Simpan</button>
+                                 <button type="button" class="btn btn--secondary reset-btn"><i class="fas fa-undo"></i> Reset</button>
+                             </div>
+                         </form>
+                         <div id="results-container" class="results hidden">
+                             <h3>Hasil Kuesioner</h3>
+                             <div class="results-content">
+                                 <div class="score-display">
+                                     <div class="score-number" id="score-display">0</div>
+                                     <!-- PERUBAHAN: Total skor disesuaikan -->
+                                     <div class="score-total">dari 20</div>
+                                 </div>
+                                 <div class="interpretation" id="interpretation"></div>
+                                 <div class="results-actions">
+                                     <button class="btn btn--outline retry-btn"><i class="fas fa-redo"></i> Isi Ulang Kuesioner</button>
+                                 </div>
+                             </div>
+                         </div>
+                     </div>
                  </div>
             </div>
 
-            <!-- Tabel Dasbor Pasien (DIMODIFIKASI) -->
-            <div class="table-container">
-                <table class="patient-table">
-                    <thead>
-                        <tr>
-                            <th>Pasien (RM)</th>
-                            <th>Operasi</th>
-                            <th>Anestesi</th>
-                            <th>Lama Post-OP</th>
-                            <th>PONV / RASS</th>
-                            <th>Mobilisasi Sekarang</th>
-                            <th>Mobilisasi Ideal</th>
-                            <th>Aksi / Saran</th>
-                        </tr>
-                    </thead>
-                    <tbody id="patient-table-body">
-                        <!-- Data pasien akan di-render oleh JavaScript -->
-                        <tr class="no-data-row">
-                            <td colspan="8">Memuat data pasien...</td>
-                        </tr>
-                    </tbody>
-                </table>
+            <!-- Observation Page -->
+            <div id="observation-page" class="page">
+                <div class="page-header">
+                    <h2>Dasbor Pasien Post-Operasi</h2>
+                    <button class="btn btn--primary" id="add-patient-btn">
+                        <i class="fas fa-user-plus"></i> Tambah Pasien Baru
+                    </button>
+                </div>
+                
+                <div class="dashboard-controls">
+                    <div class="nurse-selector form-group">
+                        <label for="current-nurse-selector" class="form-label">Nama Perawat:</label>
+                        <select id="current-nurse-selector" class="form-control">
+                            <!-- Opsi perawat akan ditambahkan oleh JavaScript -->
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="info-card">
+                    <h4><i class="fas fa-walking"></i> Panduan Level Mobilisasi (Johns Hopkins - HLM)</h4>
+                    <div id="mobility-scale-info" class="mobility-scale-grid">
+                        <!-- Konten diisi oleh JavaScript -->
+                    </div>
+                </div>
+
+
+                <div class="table-container">
+                    <table class="patient-table">
+                        <thead>
+                            <tr>
+                                <th>Pasien (RM)</th>
+                                <th>Operasi</th>
+                                <th>Anestesi</th>
+                                <th>Lama Post-OP</th>
+                                <th>PONV / RASS</th>
+                                <th>Mobilisasi Sekarang</th>
+                                <th>Target Mobilisasi</th>
+                                <th>Saran / Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody id="patient-table-body">
+                            <!-- Data pasien aktif akan di-render di sini -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="archive-section">
+                    <h3><i class="fas fa-archive"></i> Arsip Pasien Pulang</h3>
+                    <div class="table-container">
+                        <table class="patient-table">
+                            <thead>
+                                <tr>
+                                    <th>Nama Pasien (RM)</th>
+                                    <th>Jenis Operasi</th>
+                                    <th>Tanggal Pulang</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="archived-patient-table-body">
+                                <!-- Data pasien yang diarsipkan akan di-render di sini -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
         </div>
-
     </main>
+
+    <!-- Modal for Add/Update Patient -->
+    <div id="patient-modal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modal-title">Data Pasien</h3>
+                <button class="modal-close-btn">&times;</button>
+            </div>
+            <div id="modal-body" class="modal-body"></div>
+        </div>
+    </div>
     
+    <div id="clinic-id-modal" class="modal-overlay hidden">
+        <div class="modal-content" style="max-width: 450px;">
+            <div class="modal-header">
+                <h3 id="clinic-id-modal-title">ID Klinik / Ruangan</h3>
+            </div>
+            <div id="clinic-id-modal-body" class="modal-body">
+                <p>Masukkan ID unik untuk klinik atau ruangan Anda untuk menyimpan dan menyinkronkan data pasien.</p>
+                <p><small><strong>Penting:</strong> Gunakan ID yang sama setiap kali Anda membuka aplikasi ini di perangkat baru atau setelah membersihkan cache.</small></p>
+                <div class="form-group" style="margin-top: 16px;">
+                    <label for="clinic-id-input" class="form-label">Tulis dibawah: bedah</label>
+                    <input type="text" id="clinic-id-input" class="form-control" placeholder="Masukkan ID unik Anda di sini...">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn--primary" id="save-clinic-id-btn">Simpan & Lanjutkan</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast" class="toast hidden">
+        <div class="toast-content"><i class="toast-icon"></i><span class="toast-message"></span></div>
+    </div>
+
     <script type="module" src="app.js"></script>
 </body>
 </html>

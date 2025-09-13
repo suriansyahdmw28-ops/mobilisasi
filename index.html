@@ -6,6 +6,8 @@
     <title>Program MLQ - RSUD Pangeran Jaya Sumitra Kotabaru</title>
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- PERUBAHAN: Menambahkan library Chart.js untuk grafik -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
     <header class="header">
@@ -36,7 +38,7 @@
 
     <main class="main">
         <div class="container">
-            <!-- Landing & Other Pages -->
+            <!-- Landing Page -->
             <div id="landing-page" class="page active">
                 <div class="hero">
                     <div class="hero-content">
@@ -52,12 +54,19 @@
                     <div class="menu-card" data-page="observation"><div class="menu-icon"><i class="fas fa-tasks"></i></div><h4>Dasbor Observasi Pasien</h4><p>Monitor kemajuan mobilisasi pasien secara real-time.</p><button class="btn btn--primary btn--sm">Buka Dasbor</button></div>
                 </div>
             </div>
-            <div id="leaflet-page" class="page"><div class="page-header"><h2>Leaflet Digital - Mobilisasi Dini</h2><a href="leaflet.pdf" download="Leaflet-Mobilisasi-Dini.pdf" class="btn btn--primary btn--sm"><i class="fas fa-download"></i> Download PDF</a></div><div class="leaflet-content"><div class="pdf-viewer-container"><iframe src="leaflet.pdf"></iframe></div></div></div>
+
+            <!-- PERUBAHAN: Mengembalikan struktur leaflet ke versi awal yang simpel -->
+            <div id="leaflet-page" class="page">
+                <div class="page-header"><h2>Leaflet Digital - Mobilisasi Dini</h2><a href="leaflet.pdf" download="Leaflet-Mobilisasi-Dini.pdf" class="btn btn--primary btn--sm"><i class="fas fa-download"></i> Download PDF</a></div>
+                <div class="pdf-viewer-container">
+                    <iframe src="leaflet.pdf"></iframe>
+                </div>
+            </div>
+            
             <div id="video-page" class="page"><div class="page-header"><h2>Video Edukasi</h2></div><div class="video-content"><div class="video-placeholder"><i class="fas fa-play-circle"></i><h3>Video akan segera tersedia.</h3></div></div></div>
             
             <!-- Questionnaire Page -->
             <div id="questionnaire-page" class="page">
-                 <!-- PERUBAHAN: Judul kuesioner disesuaikan -->
                  <div class="page-header"><h2>Kuesioner Pengetahuan & Kondisi (10 Soal)</h2><span id="test-mode-indicator" class="status status--info">Mode: Pre-Test</span></div>
                  <div class="questionnaire-content">
                      <div class="test-selector">
@@ -88,7 +97,6 @@
                              <div class="results-content">
                                  <div class="score-display">
                                      <div class="score-number" id="score-display">0</div>
-                                     <!-- PERUBAHAN: Total skor disesuaikan -->
                                      <div class="score-total">dari 20</div>
                                  </div>
                                  <div class="interpretation" id="interpretation"></div>
@@ -147,24 +155,37 @@
                     </table>
                 </div>
 
-                <div class="archive-section">
-                    <h3><i class="fas fa-archive"></i> Arsip Pasien Pulang</h3>
-                    <div class="table-container">
-                        <table class="patient-table">
-                            <thead>
-                                <tr>
-                                    <th>Nama Pasien (RM)</th>
-                                    <th>Jenis Operasi</th>
-                                    <th>Tanggal Pulang</th>
-                                    <th>Status</th>
-                                </tr>
-                            </thead>
-                            <tbody id="archived-patient-table-body">
-                                <!-- Data pasien yang diarsipkan akan di-render di sini -->
-                            </tbody>
-                        </table>
+                <!-- PERUBAHAN: Bagian Arsip dihapus -->
+                
+                <!-- PERUBAHAN: Menambahkan bagian Analisis Data -->
+                <div id="data-analysis-section" class="hidden">
+                    <h3 class="section-title"><i class="fas fa-chart-line"></i> Analisis Data Ruangan</h3>
+                    <div class="analysis-grid">
+                        <div class="stat-card">
+                            <div class="stat-icon"><i class="fas fa-users"></i></div>
+                            <div class="stat-content">
+                                <div class="stat-value" id="total-patients-stat">0</div>
+                                <div class="stat-label">Pasien Aktif</div>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon"><i class="fas fa-shoe-prints"></i></div>
+                            <div class="stat-content">
+                                <div class="stat-value" id="avg-mobility-stat">0</div>
+                                <div class="stat-label">Rata-rata Level Mobilisasi</div>
+                            </div>
+                        </div>
+                        <div class="chart-container">
+                            <h4>Distribusi Level Mobilisasi</h4>
+                            <canvas id="mobility-chart-canvas"></canvas>
+                        </div>
+                        <div class="chart-container">
+                            <h4>Proporsi Jenis Anestesi</h4>
+                            <canvas id="anesthesia-chart-canvas"></canvas>
+                        </div>
                     </div>
                 </div>
+
             </div>
         </div>
     </main>
@@ -206,3 +227,4 @@
     <script type="module" src="app.js"></script>
 </body>
 </html>
+

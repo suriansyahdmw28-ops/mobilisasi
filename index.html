@@ -31,7 +31,6 @@
                 <button class="nav-item" data-page="video"><i class="fas fa-play-circle"></i><span>Video</span></button>
                 <button class="nav-item" data-page="questionnaire"><i class="fas fa-clipboard-question"></i><span>Kuesioner</span></button>
                 <button class="nav-item" data-page="observation"><i class="fas fa-tasks"></i><span>Dasbor Pasien</span></button>
-                <!-- PERUBAHAN: Menambahkan menu Analisis -->
                 <button class="nav-item" data-page="analysis"><i class="fas fa-chart-pie"></i><span>Analisis</span></button>
             </div>
         </div>
@@ -153,11 +152,9 @@
                         </tbody>
                     </table>
                 </div>
-
-                <!-- PERUBAHAN: Bagian Analisis Ruangan dipindahkan ke halaman baru -->
             </div>
 
-            <!-- PERUBAHAN: Halaman baru untuk Analisis & Wawasan -->
+            <!-- Halaman Analisis & Wawasan -->
             <div id="analysis-page" class="page">
                 <div class="page-header">
                     <h2>Analisis & Wawasan Program</h2>
@@ -165,8 +162,8 @@
 
                 <!-- Analisis Kuesioner -->
                 <div class="analysis-section">
-                    <h3 class="section-title"><i class="fas fa-clipboard-question"></i> Analisis Kuesioner (Pre vs. Post Test)</h3>
-                    <p class="section-subtitle">Menganalisis efektivitas edukasi dengan membandingkan tingkat pemahaman pasien sebelum dan sesudah intervensi.</p>
+                    <h3 class="section-title"><i class="fas fa-clipboard-question"></i> Analisis Efektivitas Edukasi</h3>
+                    <p class="section-subtitle">Membandingkan tingkat pemahaman pasien sebelum dan sesudah intervensi.</p>
                     <div id="questionnaire-analysis-container">
                         <!-- Konten analisis kuesioner akan dirender di sini oleh JavaScript -->
                     </div>
@@ -174,8 +171,8 @@
 
                 <!-- Analisis Data Pasien -->
                 <div class="analysis-section">
-                    <h3 class="section-title"><i class="fas fa-procedures"></i> Analisis Data Pasien (Semua Data)</h3>
-                    <p class="section-subtitle">Mengukur dampak program terhadap hasil klinis pasien, mencakup semua data pasien yang aktif maupun yang sudah pulang.</p>
+                    <h3 class="section-title"><i class="fas fa-chart-line"></i> Analisis Kemajuan Pasien</h3>
+                    <p class="section-subtitle">Menganalisis hubungan antara berbagai faktor klinis dengan progres mobilisasi pasien.</p>
                     <div id="patient-analysis-container">
                          <!-- Konten analisis pasien akan dirender di sini oleh JavaScript -->
                     </div>
@@ -221,3 +218,4 @@
     <script type="module" src="app.js"></script>
 </body>
 </html>
+

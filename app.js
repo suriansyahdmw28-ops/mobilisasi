@@ -1,4 +1,5 @@
 // app.js — MODIFIED with PROMIS, JH-HLM Scale, and Advanced Suggestions
+// FIX: Added stability checks for suggestion logic and restored initial mobility input.
 
 // Import Firebase services
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
@@ -10,7 +11,6 @@ const appData = {
     nurses: ["Suriansyah, S.Kep., Ns", "Akbar Wirahadi, A.Md.Kep", "Annisa Aulia Rahma, A.Md.Kep", "Dina Ghufriana, S.Kep.Ners", "Dwi Sucilowati, AMK", "Gusti Rusmiyati, S.Kep.Ners", "Gusti Rusmiyati, S.Kep.Ners", "Herliyana Paramitha, S.Kep.,Ners", "Isnawati, AMK", "Khairun Nisa, S.Kep.Ners", "Noor Makiah, AMK", "Nurmilah A, A.Md.Kep", "Qatrunnada Mufidah, A.Md.Kep", "Raudatul Hikmah, S.Kep., Ns", "Verawaty, AMK", "Zahratul Zannah, S.Kep., Ns"],
     operations: ["Appendectomy", "Hernia Repair", "Laparotomy", "Mastectomy", "BPH", "Excision", "Debridement", "ORIF", "ROI"],
     anesthesiaTypes: ["General Anesthesia", "Spinal Anesthesia", "Epidural Anesthesia", "Regional Block"],
-    // PERUBAHAN: Menggunakan Skala Mobilitas Johns Hopkins (JH-HLM) 8 Level
     mobilityScale: [
         {level: 1, name: "Level 1: Berbaring di Tempat Tidur", description: "Pasien berbaring, dapat melakukan miring kanan/kiri secara mandiri."},
         {level: 2, name: "Level 2: Duduk di Tepi Tempat Tidur", description: "Pasien mampu duduk di tepi tempat tidur setidaknya selama 1 menit."},
@@ -21,30 +21,23 @@ const appData = {
         {level: 7, name: "Level 7: Berjalan > 30 Meter", description: "Berjalan mandiri dengan atau tanpa alat bantu sejauh lebih dari 30 meter."},
         {level: 8, name: "Level 8: Naik Turun Tangga", description: "Mampu naik/turun setidaknya satu anak tangga."}
     ],
-    // PERUBAHAN: Menambahkan pertanyaan berbasis PROMIS (Pain, Physical Function)
     questionnaire: {
         questions: [
-            // Pengetahuan Umum
             { id: 1, text: "Menggerakkan badan sesegera mungkin setelah operasi akan mempercepat pemulihan.", type: "positive" },
             { id: 2, text: "Bergerak setelah operasi sangat berbahaya karena bisa membuat jahitan lepas.", type: "negative" },
             { id: 3, text: "Latihan gerak di tempat tidur adalah langkah pertama yang penting.", type: "positive" },
             { id: 4, text: "Jika terasa sangat nyeri saat bergerak, lebih baik berhenti dan panggil perawat.", type: "positive" },
-             // PROMIS - Pain Interference
             { id: 5, text: "Dalam 24 jam terakhir, rasa nyeri membuat saya sulit untuk berkonsentrasi pada hal lain.", type: "negative_promis" },
             { id: 6, text: "Dalam 24 jam terakhir, rasa nyeri mengganggu aktivitas saya di tempat tidur (misal: miring kanan-kiri).", type: "negative_promis" },
-            // PROMIS - Physical Function
             { id: 7, text: "Saya merasa cukup kuat untuk duduk sendiri di tepi tempat tidur.", type: "positive_promis" },
             { id: 8, text: "Saya yakin bisa berjalan beberapa langkah tanpa bantuan.", type: "positive_promis" },
-            // Pengetahuan Lanjutan
             { id: 9, text: "Manfaat utama bergerak setelah operasi adalah agar bisa cepat pulang.", type: "positive" },
             { id: 10, text: "Peran keluarga tidak penting, mobilisasi adalah tugas perawat sepenuhnya.", type: "negative" }
         ],
         scoring: { 
             positive: { setuju: 2, ragu: 1, tidak_setuju: 0 }, 
             negative: { setuju: 0, ragu: 1, tidak_setuju: 2 },
-            // Skor PROMIS dibalik untuk konsistensi (pernyataan negatif, setuju = skor rendah)
             negative_promis: { setuju: 0, ragu: 1, tidak_setuju: 2 },
-            // Pernyataan positif, setuju = skor tinggi
             positive_promis: { setuju: 2, ragu: 1, tidak_setuju: 0 }
         }
     }
@@ -204,8 +197,9 @@ async function saveNewPatient() {
     if (!name || !rm || !finishTimeValue) return showToast("Harap lengkapi data pasien.", "error");
     if (!selectedNurse) return showToast("Pilih nama perawat terlebih dahulu.", "warning");
 
+    // FIX: Membaca level mobilisasi awal dari input modal
     const initialObservation = {
-        mobilityLevel: 1, // Pasien baru selalu dimulai dari level 1
+        mobilityLevel: parseInt(document.getElementById('initial-mobility').value),
         painScale: 0,
         ponv: document.getElementById('initial-ponv').value,
         rass: document.getElementById('initial-rass').value,
@@ -461,24 +455,19 @@ function renderArchivedPatientTable(patients) {
     `).join('');
 }
 
-// PERUBAHAN: Logika Kalkulasi Target Mobilitas yang Lebih Kompleks
 function calculateIdealMobility(patient, latestObs) {
     const hoursPostOp = (Date.now() - (getSecondsFromTS(patient.surgeryFinishTime) * 1000)) / (3600 * 1000);
     const majorOperations = ["Laparotomy", "ORIF"];
     const isMajorOp = majorOperations.includes(patient.operation);
     
-    // Kondisi penghambat utama
     if (latestObs.ponv !== 'Tidak Ada' || latestObs.rass !== 'Sadar & Tenang') {
         return { level: 1, text: `Level 1 (Atasi ${latestObs.ponv !== 'Tidak Ada' ? 'PONV' : 'RASS'})` };
     }
     
-    // Aturan khusus untuk Anestesi Spinal
     if (patient.anesthesia === "Spinal Anesthesia" && hoursPostOp < 8) {
         return { level: 2, text: "Level 2 (Post-Spinal)" };
     }
     
-    // Target berdasarkan Waktu dan Jenis Operasi
-    // Operasi Mayor
     if (isMajorOp) {
         if (hoursPostOp < 6) return { level: 1, text: "Level 1" };
         if (hoursPostOp >= 6 && hoursPostOp < 12) return { level: 2, text: "Level 2" };
@@ -486,10 +475,7 @@ function calculateIdealMobility(patient, latestObs) {
         if (hoursPostOp >= 24 && hoursPostOp < 48) return { level: 5, text: "Level 5" };
         if (hoursPostOp >= 48 && hoursPostOp < 72) return { level: 6, text: "Level 6" };
         return { level: 7, text: "Level 7" };
-    }
-    
-    // Operasi Minor / Lainnya
-    else {
+    } else {
         if (hoursPostOp < 4) return { level: 2, text: "Level 2" };
         if (hoursPostOp >= 4 && hoursPostOp < 8) return { level: 3, text: "Level 3" };
         if (hoursPostOp >= 8 && hoursPostOp < 18) return { level: 5, text: "Level 5" };
@@ -498,7 +484,7 @@ function calculateIdealMobility(patient, latestObs) {
     }
 }
 
-// PERUBAHAN: Logika Saran Aksi yang Disesuaikan
+// FIX: Menambahkan pengecekan untuk mencegah error jika level tidak ditemukan
 function generateActionSuggestion(latestObs, idealMobility) {
     const currentLevel = latestObs.mobilityLevel;
     const idealLevel = idealMobility.level;
@@ -515,10 +501,16 @@ function generateActionSuggestion(latestObs, idealMobility) {
     } else {
         const targetAction = appData.mobilityScale.find(s => s.level === idealLevel);
         const currentAction = appData.mobilityScale.find(s => s.level === currentLevel);
-        return `<strong>Ayo Kejar!</strong> Pasien masih di <strong>${currentAction.name}</strong>. Target selanjutnya: <strong>${targetAction.name}</strong>.`;
+        
+        // Pengecekan untuk memastikan objek ditemukan sebelum mengakses properti .name
+        const currentActionName = currentAction ? currentAction.name : 'Level Saat Ini';
+        const targetActionName = targetAction ? targetAction.name : 'Target Berikutnya';
+
+        return `<strong>Ayo Kejar!</strong> Pasien masih di <strong>${currentActionName}</strong>. Target selanjutnya: <strong>${targetActionName}</strong>.`;
     }
 }
 
+// FIX: Mengembalikan input mobilisasi awal di modal tambah pasien
 function openPatientModal(patientId = null) {
     const isEditing = patientId !== null;
     const patient = isEditing ? patientsData.find(p => p.id === patientId) : null;
@@ -538,6 +530,7 @@ function openPatientModal(patientId = null) {
         <div class="modal-grid">
             <div class="form-group"><label>Mual/Muntah (PONV)</label><select id="initial-ponv" class="form-control"><option>Tidak Ada</option><option>Ringan</option><option>Berat</option></select></div>
             <div class="form-group"><label>Tingkat Kesadaran (RASS)</label><select id="initial-rass" class="form-control"><option>Sadar & Tenang</option><option>Mengantuk</option><option>Respon suara</option><option>Tak ada respon</option></select></div>
+            <div class="form-group full-width"><label>Mobilisasi Awal (JH-HLM)</label><select id="initial-mobility" class="form-control">${appData.mobilityScale.map(s=>`<option value="${s.level}">${s.name}</option>`).join('')}</select></div>
         </div>
         <div class="modal-footer"><button class="btn btn--primary" id="save-new-patient-btn">Simpan Pasien</button></div>`;
         
@@ -630,3 +623,4 @@ function showConfirmationDialog(message, onConfirm) {
     };
     document.getElementById('confirm-cancel').onclick = closeDialog;
 }
+

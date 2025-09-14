@@ -1,4 +1,4 @@
-// app.js — MODIFIED with Advanced Logic Engine and Revamped Analysis Dashboard
+// app.js — MODIFIED with Gemini AI Integration for Clinical Suggestions
 
 // Import Firebase services
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
@@ -8,7 +8,6 @@ import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gsta
 // --- KONFIGURASI APLIKASI ---
 const appData = {
     nurses: ["Suriansyah, S.Kep., Ns", "Akbar Wirahadi, A.Md.Kep", "Annisa Aulia Rahma, A.Md.Kep", "Dina Ghufriana, S.Kep.Ners", "Dwi Sucilowati, AMK", "Gusti Rusmiyati, S.Kep.Ners", "Gusti Rusmiyati, S.Kep.Ners", "Herliyana Paramitha, S.Kep.,Ners", "Isnawati, AMK", "Khairun Nisa, S.Kep.Ners", "Noor Makiah, AMK", "Nurmilah A, A.Md.Kep", "Qatrunnada Mufidah, A.Md.Kep", "Raudatul Hikmah, S.Kep., Ns", "Verawaty, AMK", "Zahratul Zannah, S.Kep., Ns"],
-    // PERUBAHAN: Menambahkan opsi "Lainnya..."
     operations: ["Appendectomy", "Hernia Repair", "Laparotomy", "Mastectomy", "BPH", "Excision", "Debridement", "ORIF", "ROI", "Lainnya..."],
     anesthesiaTypes: ["General Anesthesia", "Spinal Anesthesia", "Epidural Anesthesia", "Regional Block"],
     mobilityScale: [
@@ -50,7 +49,6 @@ let allPatientsData = [];
 let questionnaireData = [];
 let chartInstances = {};
 
-// PERUBAHAN: Menambahkan default styling untuk Chart.js
 Chart.defaults.font.family = "'Inter', sans-serif";
 Chart.defaults.color = 'var(--color-text-secondary)';
 Chart.defaults.borderColor = 'rgba(var(--color-brown-600-rgb), 0.1)';
@@ -174,18 +172,20 @@ function listenForPatientUpdates() {
     const q = query(collection(db, collectionPath));
     
     const tableBody = document.getElementById('patient-table-body');
-    if (tableBody) tableBody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding: 20px;"><i class="fas fa-spinner fa-spin"></i> Memuat data pasien...</td></tr>`;
+    if (tableBody) tableBody.innerHTML = `<tr><td colspan="8" class="text-center p-5"><i class="fas fa-spinner fa-spin"></i> Memuat data pasien...</td></tr>`;
     
-    onSnapshot(q, snapshot => {
+    onSnapshot(q, async snapshot => {
         allPatientsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const activePatients = allPatientsData
+            .filter(p => p.status === 'aktif' && p.surgeryFinishTime)
+            .sort((a,b) => getSecondsFromTS(b.surgeryFinishTime) - getSecondsFromTS(a.surgeryFinishTime));
         
-        const activePatients = allPatientsData.filter(p => p.status === 'aktif' && p.surgeryFinishTime);
-        renderPatientTable(activePatients.sort((a,b) => getSecondsFromTS(b.surgeryFinishTime) - getSecondsFromTS(a.surgeryFinishTime)));
+        await renderPatientTable(activePatients);
 
     }, error => {
         console.error("Error listening to patient updates:", error);
         showToast("Gagal memuat data pasien.", "error");
-        if (tableBody) tableBody.innerHTML = `<tr><td colspan="8" style="text-align:center; color: var(--color-error); padding: 20px;"><i class="fas fa-exclamation-triangle"></i> Gagal memuat data.</td></tr>`;
+        if (tableBody) tableBody.innerHTML = `<tr><td colspan="8" class="text-center p-5 text-red-500"><i class="fas fa-exclamation-triangle"></i> Gagal memuat data.</td></tr>`;
     });
 }
 
@@ -209,7 +209,6 @@ async function saveNewPatient() {
     const finishTimeValue = document.getElementById('patient-finish-time').value;
     const selectedNurse = document.getElementById('current-nurse-selector').value;
     
-    // PERUBAHAN: Logika untuk mendapatkan jenis operasi
     const operationSelect = document.getElementById('patient-operation').value;
     let finalOperation = operationSelect;
     if (operationSelect === 'Lainnya...') {
@@ -455,106 +454,154 @@ function populateNurseSelector() {
     selector.innerHTML = `<option value="">-- Pilih Perawat --</option>` + appData.nurses.sort().map(nurse => `<option value="${nurse}">${nurse}</option>`).join('');
 }
 
-function renderPatientTable(patients) {
+async function renderPatientTable(patients) {
     const tableBody = document.getElementById('patient-table-body');
     if (!tableBody) return;
     if (patients.length === 0) {
         tableBody.innerHTML = `<tr class="no-data-row"><td colspan="8">Belum ada data pasien aktif. Klik 'Tambah Pasien Baru' untuk memulai.</td></tr>`;
         return;
     }
-    tableBody.innerHTML = patients.map(p => {
-        const plan = getMobilizationPlan(p);
+
+    const patientPromises = patients.map(p => {
         const latestObs = p.latestObservation || { ponv: 'N/A', rass: 'N/A', mobilityLevel: 1 };
         const finishSeconds = getSecondsFromTS(p.surgeryFinishTime);
         return `
-            <tr>
+            <tr data-patient-id="${p.id}">
                 <td><strong>${p.name}</strong><br><small>${p.rm}</small></td>
                 <td>${p.operation}</td>
                 <td>${p.anesthesia}</td>
                 <td class="post-op-time" data-timestamp="${finishSeconds}">${formatElapsedTime(finishSeconds * 1000)}</td>
                 <td>${latestObs.ponv} / ${latestObs.rass}</td>
                 <td><span class="status status-level-${latestObs.mobilityLevel}">Level ${latestObs.mobilityLevel}</span></td>
-                <td><span class="status status-level-${plan.targetLevel}" title="${plan.reason}">${plan.targetText}</span></td>
-                <td>
-                    <div class="suggestion-text">${plan.suggestion}</div>
-                    <div class="action-buttons">
-                        <button class="btn btn--primary btn--sm update-patient-btn" data-id="${p.id}"><i class="fas fa-edit"></i> Update</button>
-                        <button class="btn btn--success btn--sm discharge-patient-btn" data-id="${p.id}"><i class="fas fa-check-circle"></i> Pulang</button>
-                        <button class="btn btn--danger btn--sm delete-patient-btn" data-id="${p.id}"><i class="fas fa-trash-alt"></i> Hapus</button>
+                <td class="target-cell"><div class="loading-state"><i class="fas fa-spinner fa-spin"></i> AI...</div></td>
+                <td class="suggestion-cell">
+                    <div class="loading-state"><i class="fas fa-spinner fa-spin"></i> Menganalisis...</div>
+                    <div class="suggestion-content" style="display:none;">
+                         <div class="suggestion-text"></div>
+                         <div class="action-buttons">
+                            <button class="btn btn--primary btn--sm update-patient-btn" data-id="${p.id}"><i class="fas fa-edit"></i> Update</button>
+                            <button class="btn btn--success btn--sm discharge-patient-btn" data-id="${p.id}"><i class="fas fa-check-circle"></i> Pulang</button>
+                            <button class="btn btn--danger btn--sm delete-patient-btn" data-id="${p.id}"><i class="fas fa-trash-alt"></i> Hapus</button>
+                        </div>
                     </div>
                 </td>
             </tr>`;
-    }).join('');
+    });
+    tableBody.innerHTML = patientPromises.join('');
+
+    // PERUBAHAN: Panggil AI untuk setiap pasien setelah render awal
+    for (const patient of patients) {
+        getAIPlan(patient).then(plan => {
+            const row = tableBody.querySelector(`tr[data-patient-id="${patient.id}"]`);
+            if (row) {
+                const targetCell = row.querySelector('.target-cell');
+                const suggestionCell = row.querySelector('.suggestion-cell');
+                
+                targetCell.innerHTML = `<span class="status status-level-${plan.targetLevel}" title="${plan.reason || ''}">${plan.targetText}</span>`;
+                
+                suggestionCell.querySelector('.loading-state').style.display = 'none';
+                const content = suggestionCell.querySelector('.suggestion-content');
+                content.querySelector('.suggestion-text').innerHTML = `${plan.suggestion} <span class="ai-badge">✨ AI</span>`;
+                content.style.display = 'block';
+            }
+        });
+    }
 }
 
-// --- MOBILIZATION LOGIC ENGINE ---
-function getMobilizationPlan(patient) {
+
+// --- PERUBAHAN BESAR: INTEGRASI GEMINI AI ---
+async function getAIPlan(patient) {
     const latestObs = patient.latestObservation || { mobilityLevel: 1, ponv: 'Tidak Ada', rass: 'Sadar & Tenang', painScale: 0 };
     const hoursPostOp = (Date.now() - (getSecondsFromTS(patient.surgeryFinishTime) * 1000)) / (3600 * 1000);
-    const pod = Math.floor(hoursPostOp / 24); // Post-Operative Day
+    const pod = Math.floor(hoursPostOp / 24);
+
+    const systemPrompt = `Anda adalah seorang perawat klinis ahli pemulihan pasca-operasi di sebuah rumah sakit di Indonesia. Tugas Anda adalah memberikan rekomendasi mobilisasi dini yang aman dan efektif. Berikan jawaban HANYA dalam format JSON.
+    Format JSON harus berisi tiga kunci: "targetLevel" (angka integer antara 1-8), "targetText" (string, contoh: "Level 4"), dan "suggestion" (string dalam Bahasa Indonesia, singkat, jelas, dan berorientasi pada tindakan untuk perawat).
+    Analisis data pasien berikut dan tentukan target serta saran yang paling sesuai. Pertimbangkan semua faktor secara holistik.
+    - Prioritaskan keamanan: Jika ada PONV, RASS yang tidak stabil, atau efek anestesi spinal, target harus konservatif.
+    - Bersikap progresif: Jika pasien stabil, dorong ke level berikutnya.
+    - Berikan saran yang spesifik dan dapat ditindaklanjuti.`;
+
+    const userQuery = `
+    Data Pasien:
+    - Hari Pasca-Operasi (POD): ${pod} (${hoursPostOp.toFixed(1)} jam)
+    - Jenis Operasi: ${patient.operation}
+    - Jenis Anestesi: ${patient.anesthesia}
+    - Level Mobilisasi Saat Ini: Level ${latestObs.mobilityLevel}
+    - Kondisi PONV: ${latestObs.ponv}
+    - Kondisi RASS: ${latestObs.rass}
+    - Skala Nyeri (0-10): ${latestObs.painScale}
+
+    Berdasarkan data di atas, berikan rekomendasi mobilisasi dalam format JSON yang diminta.`;
+
+    try {
+        const apiKey = "";
+        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+        
+        const payload = {
+            contents: [{ parts: [{ text: userQuery }] }],
+            systemInstruction: { parts: [{ text: systemPrompt }] },
+             generationConfig: {
+                responseMimeType: "application/json",
+            }
+        };
+
+        const response = await fetch(apiUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) {
+            console.error("AI API Error:", response.status, response.statusText);
+            throw new Error('AI response not OK');
+        }
+
+        const result = await response.json();
+        const jsonString = result.candidates?.[0]?.content?.parts?.[0]?.text;
+        
+        if (jsonString) {
+            const parsedJson = JSON.parse(jsonString);
+            // Validasi dasar
+            if (parsedJson.targetLevel && parsedJson.targetText && parsedJson.suggestion) {
+                return parsedJson;
+            }
+        }
+        throw new Error('Invalid JSON response from AI');
+
+    } catch (error) {
+        console.warn("AI recommendation failed, falling back to rule-based logic.", error);
+        return getRuleBasedPlan(patient); // Fallback to a simpler, rule-based system
+    }
+}
+
+// Fallback logic if AI fails
+function getRuleBasedPlan(patient) {
+    const latestObs = patient.latestObservation || { mobilityLevel: 1, ponv: 'Tidak Ada', rass: 'Sadar & Tenang', painScale: 0 };
+    const hoursPostOp = (Date.now() - (getSecondsFromTS(patient.surgeryFinishTime) * 1000)) / (3600 * 1000);
+    const pod = Math.floor(hoursPostOp / 24);
     const currentLevel = latestObs.mobilityLevel;
 
-    let targetLevel = 1;
-    let reason = "Target dasar untuk POD " + pod;
+    let targetLevel = (pod < 1) ? 3 : (pod < 2 ? 4 : 5); // Simple POD-based target
     let suggestions = [];
 
-    // Step 1: Determine Base Target by POD
-    if (pod === 0) { // < 24 jam
-        targetLevel = (hoursPostOp < 8) ? 2 : 3;
-        reason = `Target POD 0 (${hoursPostOp.toFixed(0)} jam post-op)`;
-    } else if (pod === 1) { // 24-48 jam
-        targetLevel = 4;
-        reason = "Target POD 1";
-    } else if (pod === 2) { // 48-72 jam
-        targetLevel = 5;
-        reason = "Target POD 2";
-    } else { // > 72 jam
-        targetLevel = 6;
-        reason = "Target POD 3+";
-    }
-
-    // Step 2: Apply Adjustments based on Operation & Anesthesia
-    const isMajorOp = ["Laparotomy", "ORIF"].includes(patient.operation);
-    if (isMajorOp && pod < 2) {
-        targetLevel = Math.max(1, targetLevel - 1);
-        reason += ", disesuaikan untuk op. mayor";
-    }
-
-    const isSpinal = ["Spinal Anesthesia", "Epidural Anesthesia"].includes(patient.anesthesia);
-    if (isSpinal && hoursPostOp < 8) {
-        targetLevel = Math.min(targetLevel, 2);
-        reason = "Target dibatasi (efek anestesi spinal < 8 jam)";
-        suggestions.push("<strong>Aksi:</strong> Pastikan kekuatan motorik & sensorik tungkai bawah pulih sepenuhnya sebelum mencoba berdiri untuk mencegah risiko jatuh.");
+    if (latestObs.ponv !== 'Tidak Ada' || latestObs.rass !== 'Sadar & Tenang') {
+        targetLevel = Math.min(targetLevel, currentLevel, 2);
+        suggestions.push("<strong>Prioritas:</strong> Atasi PONV/RASS sebelum melanjutkan mobilisasi.");
     }
     
-    // Step 3: Check for Overriding Barriers
-    if (latestObs.ponv !== 'Tidak Ada') {
-        suggestions.unshift("<strong>Prioritas:</strong> Atasi mual/muntah (PONV). Kolaborasi dengan DPJP untuk antiemetik yang efektif.");
-    }
-    if (latestObs.rass !== 'Sadar & Tenang') {
-        suggestions.unshift("<strong>Prioritas:</strong> Stabilkan kesadaran (RASS). Lakukan observasi ketat pada tanda-tanda vital.");
-    }
-    if (latestObs.painScale > 6) {
-        suggestions.push("<strong>Saran:</strong> Berikan manajemen nyeri yang adekuat sebelum mobilisasi. Anjurkan teknik relaksasi napas dalam.");
-    }
-    
-    // Step 4: Generate Final Suggestion Text
     const isTargetAchieved = currentLevel >= targetLevel;
-    const targetLevelInfo = appData.mobilityScale.find(l => l.level === targetLevel);
-    
+
     if (isTargetAchieved) {
-        const nextLevelInfo = appData.mobilityScale.find(l => l.level === currentLevel + 1);
-        suggestions.unshift(`<strong>Luar Biasa!</strong> Target tercapai. Pertahankan level saat ini dan dorong ke <strong>${nextLevelInfo ? nextLevelInfo.name : 'level berikutnya'}</strong> jika kondisi pasien stabil.`);
+        suggestions.unshift(`<strong>Pertahankan!</strong> Target tercapai. Dorong ke level berikutnya jika kondisi stabil.`);
     } else {
-        suggestions.unshift(`<strong>Ayo Kejar!</strong> Pasien belum mencapai target <strong>${targetLevelInfo.name}</strong>. Fokus pada intervensi untuk mencapai target tersebut.`);
+        suggestions.unshift(`<strong>Ayo Kejar!</strong> Fokus untuk mencapai Level ${targetLevel}.`);
     }
 
     return {
         targetLevel: targetLevel,
         targetText: `Level ${targetLevel}`,
-        reason: reason,
-        isTargetAchieved: isTargetAchieved,
-        suggestion: suggestions.join('<br>')
+        suggestion: suggestions.join('<br>') + ' <span class="ai-badge fallback">Fallback</span>' // Indicate it's a fallback
     };
 }
 
@@ -565,7 +612,6 @@ function openPatientModal(patientId = null) {
     document.getElementById('modal-title').textContent = isEditing ? 'Update Observasi Pasien' : 'Tambah Pasien Baru';
     const modalBody = document.getElementById('modal-body');
     
-    // PERUBAHAN: Menambahkan kontainer untuk input operasi lainnya
     const addForm = `
         <div class="modal-grid">
             <div class="form-group"><label for="patient-name">Nama Pasien</label><input type="text" id="patient-name" class="form-control" required></div>
@@ -613,15 +659,10 @@ function openPatientModal(patientId = null) {
         document.getElementById('patient-finish-time').value = now.toISOString().slice(0, 16);
         document.getElementById('save-new-patient-btn').addEventListener('click', saveNewPatient);
 
-        // PERUBAHAN: Menambahkan event listener untuk menampilkan/menyembunyikan input "Lainnya..."
         const operationSelect = document.getElementById('patient-operation');
         const otherOperationContainer = document.getElementById('other-operation-container');
         operationSelect.addEventListener('change', () => {
-            if (operationSelect.value === 'Lainnya...') {
-                otherOperationContainer.classList.remove('hidden');
-            } else {
-                otherOperationContainer.classList.add('hidden');
-            }
+            otherOperationContainer.classList.toggle('hidden', operationSelect.value !== 'Lainnya...');
         });
     }
     
@@ -770,7 +811,7 @@ function renderPatientDashboardAnalysis(data) {
     let noBarrierAchieved = 0, noBarrierNotAchieved = 0;
     data.forEach(p => {
         if (p.latestObservation) {
-            const plan = getMobilizationPlan(p);
+            const plan = getRuleBasedPlan(p); // Use rule-based for analysis consistency
             const hasBarrier = p.latestObservation.ponv !== 'Tidak Ada' || p.latestObservation.rass !== 'Sadar & Tenang';
             if (hasBarrier) {
                 plan.isTargetAchieved ? barrierAchieved++ : barrierNotAchieved++;
@@ -795,7 +836,6 @@ function renderChart(canvasId, type, data, options = {}) {
         chartInstances[canvasId].destroy();
     }
     const defaultOptions = {
-        // PERUBAHAN: Set maintainAspectRatio ke true dan responsive ke true
         maintainAspectRatio: true, 
         responsive: true,
         plugins: {
@@ -821,7 +861,6 @@ function renderChart(canvasId, type, data, options = {}) {
         },
     };
 
-    // Hapus scales untuk pie/doughnut karena tidak relevan
     if (type === 'pie' || type === 'doughnut') {
         delete defaultOptions.scales;
     }

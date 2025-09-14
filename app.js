@@ -172,7 +172,7 @@ function listenForPatientUpdates() {
     const q = query(collection(db, collectionPath));
     
     const tableBody = document.getElementById('patient-table-body');
-    if (tableBody) tableBody.innerHTML = `<tr><td colspan="8" class="text-center p-5"><i class="fas fa-spinner fa-spin"></i> Memuat data pasien...</td></tr>`;
+    if (tableBody) tableBody.innerHTML = `<tr><td colspan="9" class="text-center p-5"><i class="fas fa-spinner fa-spin"></i> Memuat data pasien...</td></tr>`;
     
     onSnapshot(q, async snapshot => {
         allPatientsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -185,7 +185,7 @@ function listenForPatientUpdates() {
     }, error => {
         console.error("Error listening to patient updates:", error);
         showToast("Gagal memuat data pasien.", "error");
-        if (tableBody) tableBody.innerHTML = `<tr><td colspan="8" class="text-center p-5 text-red-500"><i class="fas fa-exclamation-triangle"></i> Gagal memuat data.</td></tr>`;
+        if (tableBody) tableBody.innerHTML = `<tr><td colspan="9" class="text-center p-5 text-red-500"><i class="fas fa-exclamation-triangle"></i> Gagal memuat data.</td></tr>`;
     });
 }
 
@@ -206,6 +206,8 @@ async function saveNewPatient() {
     if(!userId || !clinicId) return showToast("Koneksi ke database belum siap.", "error");
     const name = document.getElementById('patient-name').value;
     const rm = document.getElementById('patient-rm').value;
+    const age = document.getElementById('patient-age').value;
+    const gender = document.getElementById('patient-gender').value;
     const finishTimeValue = document.getElementById('patient-finish-time').value;
     const selectedNurse = document.getElementById('current-nurse-selector').value;
     
@@ -218,7 +220,7 @@ async function saveNewPatient() {
         }
     }
 
-    if (!name || !rm || !finishTimeValue) return showToast("Harap lengkapi data pasien.", "error");
+    if (!name || !rm || !age || !finishTimeValue) return showToast("Harap lengkapi semua data pasien.", "error");
     if (!selectedNurse) return showToast("Pilih nama perawat terlebih dahulu.", "warning");
 
     const initialObservation = {
@@ -231,7 +233,7 @@ async function saveNewPatient() {
     };
     
     const newPatient = {
-        name, rm, 
+        name, rm, age, gender,
         operation: finalOperation,
         anesthesia: document.getElementById('patient-anesthesia').value,
         surgeryFinishTime: new Date(finishTimeValue),
@@ -322,18 +324,17 @@ function getSecondsFromTS(ts) {
     return Math.floor(new Date(ts).getTime()/1000);
 }
 
-function formatElapsedTime(timestamp) {
-    const seconds = Math.floor((Date.now() - timestamp) / 1000);
-    if (seconds < 60) return `< 1 mnt`;
-    const days = Math.floor(seconds / 86400);
-    const hours = Math.floor((seconds % 86400) / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    let result = '';
-    if (days > 0) result += `${days} hari `;
-    if (hours > 0) result += `${hours} jam `;
-    if (minutes > 0) result += `${minutes} mnt`;
-    return result.trim() || 'Baru saja';
+function formatPostOpDuration(timestamp) {
+    const totalMinutes = Math.floor((Date.now() - timestamp) / (1000 * 60));
+    if (totalMinutes < 0) return 'Baru saja';
+    if (totalMinutes < 60) return `${totalMinutes} mnt`;
+    
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    
+    return `${hours} jam ${minutes} mnt`;
 }
+
 
 let currentTestType = 'pretest';
 
@@ -458,7 +459,7 @@ async function renderPatientTable(patients) {
     const tableBody = document.getElementById('patient-table-body');
     if (!tableBody) return;
     if (patients.length === 0) {
-        tableBody.innerHTML = `<tr class="no-data-row"><td colspan="8">Belum ada data pasien aktif. Klik 'Tambah Pasien Baru' untuk memulai.</td></tr>`;
+        tableBody.innerHTML = `<tr class="no-data-row"><td colspan="9">Belum ada data pasien aktif. Klik 'Tambah Pasien Baru' untuk memulai.</td></tr>`;
         return;
     }
 
@@ -468,9 +469,10 @@ async function renderPatientTable(patients) {
         return `
             <tr data-patient-id="${p.id}">
                 <td><strong>${p.name}</strong><br><small>${p.rm}</small></td>
+                <td>${p.age} thn<br><small>${p.gender}</small></td>
                 <td>${p.operation}</td>
                 <td>${p.anesthesia}</td>
-                <td class="post-op-time" data-timestamp="${finishSeconds}">${formatElapsedTime(finishSeconds * 1000)}</td>
+                <td class="post-op-time" data-timestamp="${finishSeconds}">${formatPostOpDuration(finishSeconds * 1000)}</td>
                 <td>${latestObs.ponv} / ${latestObs.rass}</td>
                 <td><span class="status status-level-${latestObs.mobilityLevel}">Level ${latestObs.mobilityLevel}</span></td>
                 <td class="target-cell"><div class="loading-state"><i class="fas fa-spinner fa-spin"></i> AI...</div></td>
@@ -489,7 +491,7 @@ async function renderPatientTable(patients) {
     });
     tableBody.innerHTML = patientPromises.join('');
 
-    // PERUBAHAN: Panggil AI untuk setiap pasien setelah render awal
+    // Panggil AI untuk setiap pasien setelah render awal
     for (const patient of patients) {
         getAIPlan(patient).then(plan => {
             const row = tableBody.querySelector(`tr[data-patient-id="${patient.id}"]`);
@@ -513,29 +515,30 @@ async function renderPatientTable(patients) {
 async function getAIPlan(patient) {
     const latestObs = patient.latestObservation || { mobilityLevel: 1, ponv: 'Tidak Ada', rass: 'Sadar & Tenang', painScale: 0 };
     const hoursPostOp = (Date.now() - (getSecondsFromTS(patient.surgeryFinishTime) * 1000)) / (3600 * 1000);
-    const pod = Math.floor(hoursPostOp / 24);
 
     const systemPrompt = `Anda adalah seorang perawat klinis ahli pemulihan pasca-operasi di sebuah rumah sakit di Indonesia. Tugas Anda adalah memberikan rekomendasi mobilisasi dini yang aman dan efektif. Berikan jawaban HANYA dalam format JSON.
     Format JSON harus berisi tiga kunci: "targetLevel" (angka integer antara 1-8), "targetText" (string, contoh: "Level 4"), dan "suggestion" (string dalam Bahasa Indonesia, singkat, jelas, dan berorientasi pada tindakan untuk perawat).
-    Analisis data pasien berikut dan tentukan target serta saran yang paling sesuai. Pertimbangkan semua faktor secara holistik.
+    Analisis data pasien berikut dan tentukan target serta saran yang paling sesuai. Pertimbangkan semua faktor secara holistik (umur, jenis kelamin, jenis operasi, anestesi, lama post-op, ponv, rass, dll).
     - Prioritaskan keamanan: Jika ada PONV, RASS yang tidak stabil, atau efek anestesi spinal, target harus konservatif.
     - Bersikap progresif: Jika pasien stabil, dorong ke level berikutnya.
     - Berikan saran yang spesifik dan dapat ditindaklanjuti.`;
 
     const userQuery = `
     Data Pasien:
-    - Hari Pasca-Operasi (POD): ${pod} (${hoursPostOp.toFixed(1)} jam)
+    - Umur: ${patient.age} tahun
+    - Jenis Kelamin: ${patient.gender}
+    - Waktu Pasca-Operasi: ${hoursPostOp.toFixed(1)} jam
     - Jenis Operasi: ${patient.operation}
     - Jenis Anestesi: ${patient.anesthesia}
     - Level Mobilisasi Saat Ini: Level ${latestObs.mobilityLevel}
-    - Kondisi PONV: ${latestObs.ponv}
-    - Kondisi RASS: ${latestObs.rass}
+    - Kondisi PONV (Mual/Muntah): ${latestObs.ponv}
+    - Tingkat Kesadaran (RASS): ${latestObs.rass}
     - Skala Nyeri (0-10): ${latestObs.painScale}
 
     Berdasarkan data di atas, berikan rekomendasi mobilisasi dalam format JSON yang diminta.`;
 
     try {
-        const apiKey = "";
+        const apiKey = ""; // Kunci API akan disediakan oleh lingkungan runtime
         const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
         
         const payload = {
@@ -562,7 +565,6 @@ async function getAIPlan(patient) {
         
         if (jsonString) {
             const parsedJson = JSON.parse(jsonString);
-            // Validasi dasar
             if (parsedJson.targetLevel && parsedJson.targetText && parsedJson.suggestion) {
                 return parsedJson;
             }
@@ -579,10 +581,9 @@ async function getAIPlan(patient) {
 function getRuleBasedPlan(patient) {
     const latestObs = patient.latestObservation || { mobilityLevel: 1, ponv: 'Tidak Ada', rass: 'Sadar & Tenang', painScale: 0 };
     const hoursPostOp = (Date.now() - (getSecondsFromTS(patient.surgeryFinishTime) * 1000)) / (3600 * 1000);
-    const pod = Math.floor(hoursPostOp / 24);
     const currentLevel = latestObs.mobilityLevel;
 
-    let targetLevel = (pod < 1) ? 3 : (pod < 2 ? 4 : 5); // Simple POD-based target
+    let targetLevel = (hoursPostOp < 24) ? 3 : (hoursPostOp < 48 ? 4 : 5); // Simple hour-based target
     let suggestions = [];
 
     if (latestObs.ponv !== 'Tidak Ada' || latestObs.rass !== 'Sadar & Tenang') {
@@ -590,6 +591,11 @@ function getRuleBasedPlan(patient) {
         suggestions.push("<strong>Prioritas:</strong> Atasi PONV/RASS sebelum melanjutkan mobilisasi.");
     }
     
+    if (patient.anesthesia.toLowerCase().includes('spinal') && hoursPostOp < 8) {
+        targetLevel = 1;
+        suggestions.push("<strong>Perhatian Anestesi Spinal:</strong> Pasien dalam 8 jam pertama, fokus pada miring kanan/kiri.");
+    }
+
     const isTargetAchieved = currentLevel >= targetLevel;
 
     if (isTargetAchieved) {
@@ -616,6 +622,8 @@ function openPatientModal(patientId = null) {
         <div class="modal-grid">
             <div class="form-group"><label for="patient-name">Nama Pasien</label><input type="text" id="patient-name" class="form-control" required></div>
             <div class="form-group"><label for="patient-rm">Nomor RM</label><input type="text" id="patient-rm" class="form-control" required></div>
+            <div class="form-group"><label for="patient-age">Umur (Tahun)</label><input type="number" id="patient-age" class="form-control" min="0" required></div>
+            <div class="form-group"><label for="patient-gender">Jenis Kelamin</label><select id="patient-gender" class="form-control"><option>Laki-laki</option><option>Perempuan</option></select></div>
             <div class="form-group full-width"><label for="patient-operation">Jenis Operasi</label><select id="patient-operation" class="form-control">${appData.operations.map(op=>`<option value="${op}">${op}</option>`).join('')}</select></div>
             <div class="form-group full-width hidden" id="other-operation-container">
                 <label for="patient-operation-other">Sebutkan Jenis Operasi</label>
@@ -634,7 +642,9 @@ function openPatientModal(patientId = null) {
         <div class="modal-footer"><button class="btn btn--primary" id="save-new-patient-btn">Simpan Pasien</button></div>`;
         
     const updateForm = `
-        <h4>Pasien: ${patient?.name} (${patient?.rm})</h4><hr class="form-divider">
+        <h4>Pasien: ${patient?.name} (${patient?.rm})</h4>
+        <p class="patient-info-subtitle">${patient?.age} tahun, ${patient?.gender}</p>
+        <hr class="form-divider">
         <div class="modal-grid">
             <div class="form-group full-width"><label>Update Skala Mobilitas (JH-HLM)</label><select id="update-mobility" class="form-control">${appData.mobilityScale.map(s=>`<option value="${s.level}">${s.name}</option>`).join('')}</select></div>
             <div class="form-group"><label>Skala Nyeri (0-10)</label><input type="number" id="update-pain" class="form-control" min="0" max="10" value="0"></div>
@@ -678,11 +688,11 @@ function startRealtimeClocks() {
         document.querySelectorAll('.post-op-time').forEach(el => {
             const timestamp = parseInt(el.dataset.timestamp, 10);
             if (!isNaN(timestamp)) {
-               el.textContent = formatElapsedTime(timestamp * 1000);
+               el.textContent = formatPostOpDuration(timestamp * 1000);
             }
         });
     };
-    setInterval(updateTimes, 1000 * 30);
+    setInterval(updateTimes, 1000 * 60); // Update setiap menit
     updateTimes();
 }
 
@@ -813,10 +823,11 @@ function renderPatientDashboardAnalysis(data) {
         if (p.latestObservation) {
             const plan = getRuleBasedPlan(p); // Use rule-based for analysis consistency
             const hasBarrier = p.latestObservation.ponv !== 'Tidak Ada' || p.latestObservation.rass !== 'Sadar & Tenang';
+            const isTargetAchieved = p.latestObservation.mobilityLevel >= plan.targetLevel;
             if (hasBarrier) {
-                plan.isTargetAchieved ? barrierAchieved++ : barrierNotAchieved++;
+                isTargetAchieved ? barrierAchieved++ : barrierNotAchieved++;
             } else {
-                plan.isTargetAchieved ? noBarrierAchieved++ : noBarrierNotAchieved++;
+                isTargetAchieved ? noBarrierAchieved++ : noBarrierNotAchieved++;
             }
         }
     });
@@ -831,7 +842,8 @@ function renderPatientDashboardAnalysis(data) {
 
 
 function renderChart(canvasId, type, data, options = {}) {
-    const ctx = document.getElementById(canvasId).getContext('2d');
+    const ctx = document.getElementById(canvasId)?.getContext('2d');
+    if (!ctx) return;
     if (chartInstances[canvasId]) {
         chartInstances[canvasId].destroy();
     }
@@ -914,4 +926,3 @@ function showConfirmationDialog(message, onConfirm) {
     };
     document.getElementById('confirm-cancel').onclick = closeDialog;
 }
-

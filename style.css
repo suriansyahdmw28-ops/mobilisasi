@@ -176,22 +176,28 @@ p:last-child { margin-bottom: 0; }
 .patient-table { width: 100%; border-collapse: collapse; }
 
 .patient-table th, .patient-table td {
-    padding: var(--space-16);
+    padding: var(--space-12);
     text-align: left;
     border-bottom: 1px solid var(--color-border);
     white-space: nowrap;
-    vertical-align: top;
+    vertical-align: middle;
 }
-.patient-table th:nth-child(1), .patient-table td:nth-child(1) { width: 15%; min-width: 160px; } 
-.patient-table th:nth-child(2), .patient-table td:nth-child(2) { width: 15%; min-width: 150px; } 
-.patient-table th:nth-child(8), .patient-table td:nth-child(8) { width: 30%; min-width: 280px; } 
+
+.patient-table td {
+    font-size: var(--font-size-sm);
+}
+
+.patient-table th:nth-child(1), .patient-table td:nth-child(1) { width: 16%; min-width: 170px; } 
+.patient-table th:nth-child(2), .patient-table td:nth-child(2) { width: 8%; min-width: 80px; } 
+.patient-table th:nth-child(9), .patient-table td:nth-child(9) { width: 28%; min-width: 280px; white-space: normal; } 
+
 .suggestion-text {
     white-space: normal;
     font-size: var(--font-size-sm);
     line-height: 1.5;
     max-width: none;
 }
-/* PERUBAHAN: Style untuk loading state dan AI badge */
+/* Style untuk loading state dan AI badge */
 .loading-state {
     color: var(--color-text-secondary);
     font-size: var(--font-size-sm);
@@ -211,7 +217,6 @@ p:last-child { margin-bottom: 0; }
     background-color: rgba(var(--color-warning-rgb), 0.1);
     color: var(--color-warning);
 }
-
 
 .patient-table th { background-color: var(--color-bg-1); font-weight: var(--font-weight-bold); font-size: var(--font-size-sm); }
 .patient-table tbody tr:hover { background-color: var(--color-secondary); }
@@ -262,7 +267,7 @@ p:last-child { margin-bottom: 0; }
 
 .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); display: flex; justify-content: center; align-items: center; z-index: 2000; opacity: 0; transition: opacity var(--duration-normal); pointer-events: none; }
 .modal-overlay:not(.hidden) { opacity: 1; pointer-events: auto; }
-.modal-content { background: var(--color-surface); padding: var(--space-24); border-radius: var(--radius-lg); width: 90%; max-width: 600px; max-height: 90vh; display: flex; flex-direction: column; transform: scale(0.95); transition: transform var(--duration-normal) var(--ease-standard); }
+.modal-content { background: var(--color-surface); padding: var(--space-24); border-radius: var(--radius-lg); width: 90%; max-width: 700px; max-height: 90vh; display: flex; flex-direction: column; transform: scale(0.95); transition: transform var(--duration-normal) var(--ease-standard); }
 .modal-overlay:not(.hidden) .modal-content { transform: scale(1); }
 .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-16); }
 .modal-close-btn { background: none; border: none; font-size: 24px; cursor: pointer; color: var(--color-text-secondary); }
@@ -274,6 +279,12 @@ p:last-child { margin-bottom: 0; }
     margin-top: -8px;
     margin-bottom: var(--space-16);
 }
+.patient-info-subtitle {
+    margin-top: -12px;
+    margin-bottom: 16px;
+    color: var(--color-text-secondary);
+}
+
 
 .toast { position: fixed; top: var(--space-20); right: var(--space-20); background: var(--color-surface); border: 1px solid var(--color-card-border); border-radius: var(--radius-base); box-shadow: var(--shadow-lg); padding: var(--space-16); z-index: 3000; transform: translateX(120%); opacity: 0; transition: all var(--duration-normal) var(--ease-standard); }
 .toast.show { transform: translateX(0); opacity: 1; }
@@ -299,4 +310,3 @@ p:last-child { margin-bottom: 0; }
 
 .logo-image { height: 48px; width: auto; object-fit: contain; }
 .hero-logo { max-width: 120px; height: auto; margin-top: var(--space-24); }
-

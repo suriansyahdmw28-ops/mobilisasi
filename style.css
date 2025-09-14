@@ -175,7 +175,6 @@ p:last-child { margin-bottom: 0; }
 .table-container { overflow-x: auto; background: var(--color-surface); border-radius: var(--radius-lg); border: 1px solid var(--color-card-border); margin-top: var(--space-24); }
 .patient-table { width: 100%; border-collapse: collapse; }
 
-/* PERUBAHAN: Merapikan tabel dasbor */
 .patient-table th, .patient-table td {
     padding: var(--space-16);
     text-align: left;
@@ -192,6 +191,27 @@ p:last-child { margin-bottom: 0; }
     line-height: 1.5;
     max-width: none;
 }
+/* PERUBAHAN: Style untuk loading state dan AI badge */
+.loading-state {
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-sm);
+}
+.ai-badge {
+    display: inline-block;
+    background-color: rgba(var(--color-teal-500-rgb), 0.1);
+    color: var(--color-primary);
+    padding: 2px 6px;
+    border-radius: var(--radius-full);
+    font-size: 10px;
+    font-weight: var(--font-weight-medium);
+    margin-left: var(--space-8);
+    vertical-align: middle;
+}
+.ai-badge.fallback {
+    background-color: rgba(var(--color-warning-rgb), 0.1);
+    color: var(--color-warning);
+}
+
 
 .patient-table th { background-color: var(--color-bg-1); font-weight: var(--font-weight-bold); font-size: var(--font-size-sm); }
 .patient-table tbody tr:hover { background-color: var(--color-secondary); }
@@ -221,7 +241,6 @@ p:last-child { margin-bottom: 0; }
 .stat-value { font-size: var(--font-size-3xl); font-weight: var(--font-weight-bold); line-height: 1; }
 .stat-label { font-size: var(--font-size-sm); color: var(--color-text-secondary); }
 
-/* PERUBAHAN: Mempercantik tampilan chart */
 .chart-container {
     background-color: var(--color-surface);
     border-radius: var(--radius-lg);
@@ -229,8 +248,8 @@ p:last-child { margin-bottom: 0; }
     border: 1px solid var(--color-card-border);
     box-shadow: var(--shadow-sm);
     transition: box-shadow var(--duration-normal) var(--ease-standard);
-    position: relative; /* Diperlukan agar canvas tidak overflow */
-    min-height: 380px; /* Memberi ruang yang cukup */
+    position: relative;
+    min-height: 380px;
 }
 .chart-container:hover {
     box-shadow: var(--shadow-md);
@@ -251,7 +270,6 @@ p:last-child { margin-bottom: 0; }
 .modal-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-16); }
 .modal-grid .full-width { grid-column: 1 / -1; }
 .modal-footer { margin-top: var(--space-24); display: flex; justify-content: flex-end; }
-/* PERUBAHAN: Style untuk kontainer input operasi lainnya */
 #other-operation-container {
     margin-top: -8px;
     margin-bottom: var(--space-16);

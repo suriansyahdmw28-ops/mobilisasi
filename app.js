@@ -565,71 +565,258 @@ async function renderPatientTable(patients) {
 }
 
 
-async function getAIPlan(patient) {
-    const latestObs = patient.latestObservation || { mobilityLevel: 1, ponv: 'Tidak ada keluhan', rass: '0: Alert & Calm', painScale: 0, notes: '' };
-    const hoursPostOp = (Date.now() - (getSecondsFromTS(patient.surgeryFinishTime) * 1000)) / (3600 * 1000);
-
-    const systemPrompt = `Anda adalah seorang perawat klinis ahli pemulihan pasca-operasi di sebuah rumah sakit di Indonesia. Tugas Anda adalah memberikan rekomendasi mobilisasi dini yang aman dan efektif. Berikan jawaban HANYA dalam format JSON.
-    Format JSON harus berisi tiga kunci: "targetLevel" (angka integer antara 1-8), "targetText" (string, contoh: "Level 4"), dan "suggestion" (string dalam Bahasa Indonesia, singkat, jelas, dan berorientasi pada tindakan untuk perawat).
-    Analisis data pasien berikut dan tentukan target serta saran yang paling sesuai. Pertimbangkan semua faktor secara holistik (umur, jenis kelamin, jenis operasi, anestesi, lama post-op, ponv, rass, catatan tambahan, dll).
-    - Prioritaskan keamanan: Jika ada PONV, RASS yang tidak stabil (skor selain 0), atau efek anestesi spinal, target harus konservatif.
-    - Bersikap progresif: Jika pasien stabil, dorong ke level berikutnya.
-    - Berikan saran yang spesifik dan dapat ditindaklanuti.`;
-
-    const userQuery = `
-    Data Pasien:
-    - Umur: ${patient.age} tahun
-    - Jenis Kelamin: ${patient.gender}
-    - Waktu Pasca-Operasi: ${hoursPostOp.toFixed(1)} jam
-    - Jenis Operasi: ${patient.operation}
-    - Jenis Anestesi: ${patient.anesthesia}
-    - Level Mobilisasi Saat Ini: Level ${latestObs.mobilityLevel}
-    - Kondisi PONV (Mual/Muntah): ${latestObs.ponv}
-    - Tingkat Kesadaran (RASS): ${latestObs.rass}
-    - Skala Nyeri (0-10): ${latestObs.painScale}
-    - Catatan Tambahan: ${latestObs.notes || 'Tidak ada'}
-
-    Berdasarkan data di atas, berikan rekomendasi mobilisasi dalam format JSON yang diminta.`;
-
-    try {
-        const apiKey = "";
-        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
-        
-        const payload = {
-            contents: [{ parts: [{ text: userQuery }] }],
-            systemInstruction: { parts: [{ text: systemPrompt }] },
-             generationConfig: {
-                responseMimeType: "application/json",
-            }
-        };
-
-        const response = await fetch(apiUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
-
-        if (!response.ok) {
-            console.error("AI API Error:", response.status, response.statusText);
-            throw new Error('AI response not OK');
-        }
-
-        const result = await response.json();
-        const jsonString = result.candidates?.[0]?.content?.parts?.[0]?.text;
-        
-        if (jsonString) {
-            const parsedJson = JSON.parse(jsonString);
-            if (parsedJson.targetLevel && parsedJson.targetText && parsedJson.suggestion) {
-                return parsedJson;
-            }
-        }
-        throw new Error('Invalid JSON response from AI');
-
-    } catch (error) {
-        console.warn("AI recommendation failed, falling back to rule-based logic.", error);
-        return getRuleBasedPlan(patient);
-    }
+// Utility: robust hours since surgery finish (epoch seconds or ISO string supported)
+function getHoursSince(ts) {
+  if (!ts) return NaN;
+  let ms = 0;
+  if (typeof ts === 'number') {
+    // assume seconds
+    ms = ts * 1000;
+  } else if (typeof ts === 'string') {
+    const d = new Date(ts);
+    if (!isNaN(d.getTime())) ms = d.getTime();
+  }
+  if (!ms) return NaN;
+  return (Date.now() - ms) / 3600000;
 }
+
+// JH-HLM labels (evidence-based mapping)
+const HLM_LABELS = {
+  1: "Level 1", // Berbaring
+  2: "Level 2", // Aktivitas di tempat tidur
+  3: "Level 3", // Duduk tepi tempat tidur
+  4: "Level 4", // Transfer ke kursi/commode
+  5: "Level 5", // Berdiri ≥1 menit
+  6: "Level 6", // Jalan ≥10 langkah
+  7: "Level 7", // Jalan ≥7,5 m (≥25 ft)
+  8: "Level 8"  // Jalan ≥75 m (≥250 ft)
+};
+
+// Simple classifier for clinical stability
+function classifyStability(patient, latestObs, hoursPostOp) {
+  const rassStr = (latestObs.rass || '').toString().trim();
+  const rassStable = rassStr.startsWith('0') || rassStr === '0';
+  const pain = Number.isFinite(latestObs.painScale) ? latestObs.painScale : 0;
+  const painLow = pain <= 3; // 0-3 aman untuk progresi
+  const ponvText = (latestObs.ponv || '').toLowerCase();
+  const ponvNone = ponvText.includes('tidak') || ponvText.includes('none') || ponvText.includes('no');
+  const anesthesia = (patient.anesthesia || '').toLowerCase();
+  const isSpinal = anesthesia.includes('spinal') || anesthesia.includes('subarachnoid');
+  // Spinal residual window: konservatif pada 0–6 jam pertama
+  const spinalResidual = isSpinal && Number.isFinite(hoursPostOp) && hoursPostOp < 6;
+  // Unstable if any critical factor
+  const unstable = !rassStable || !painLow || !ponvNone || spinalResidual;
+  return { rassStable, painLow, ponvNone, isSpinal, spinalResidual, unstable };
+}
+
+// Suggest allowed target range based on stability and current level
+function computeAllowedRange(currentLevel, flags) {
+  const cur = Math.min(8, Math.max(1, Number(currentLevel) || 1));
+  // Default progression: allow up to cur+1 if stable
+  let minT = cur;
+  let maxT = Math.min(8, cur + 1);
+
+  if (flags.unstable) {
+    // Constrain aggressively when unstable
+    // Cap at 3 if spinal residual or RASS not 0; otherwise cap at 4
+    const cap = (flags.spinalResidual || !flags.rassStable) ? 3 : 4;
+    maxT = Math.min(maxT, cap);
+    // Ensure min not above max
+    minT = Math.min(minT, maxT);
+  }
+  return { minTarget: minT, maxTarget: maxT };
+}
+
+// Build concise, actionable Indonesian suggestions per target level
+function levelSuggestion(level, flags) {
+  const safetyPrefix = (!flags.rassStable || !flags.painLow || !flags.ponvNone)
+    ? "Pantau tanda vital, kontrol nyeri dan mual terlebih dulu. "
+    : "";
+  switch (level) {
+    case 1: return safetyPrefix + "Ubah posisi miring kanan–kiri tiap 2 jam, latihan pernapasan, ROM pasif–aktif di tempat tidur.";
+    case 2: return safetyPrefix + "Lakukan latihan kaki (ankle pump, quad/glute set) dan bridging di tempat tidur, kepala tempat tidur 30–45° jika hemodinamik stabil.";
+    case 3: return safetyPrefix + "Bantu duduk tepi tempat tidur 5–10 menit, pantau pusing/hipotensi, ulang 2–3 sesi jika toleran.";
+    case 4: return safetyPrefix + "Transfer ke kursi dengan 1–2 pendamping/alat bantu, durasi duduk 15–30 menit, pastikan pengaman jatuh.";
+    case 5: return safetyPrefix + "Latih berdiri ≥1 menit dengan alat bantu bila perlu, uji ortostatik, ulang 2–3 kali dengan istirahat cukup.";
+    case 6: return safetyPrefix + "Jalan di kamar ≥10 langkah dengan pendamping, gunakan walker bila perlu, hentikan bila pusing/mual.";
+    case 7: return safetyPrefix + "Jalan di koridor ±10–20 m dengan satu pendamping, istirahat bila lelah, target 2 sesi/hari.";
+    case 8: return safetyPrefix + "Jalan di koridor ≥75 m total/hari dalam beberapa sesi, tingkatkan kemandirian bertahap.";
+    default: return safetyPrefix + "Mulai dari intervensi dasar dan tingkatkan bertahap sesuai toleransi.";
+  }
+}
+
+// Robust JSON extraction from model text
+function extractJson(text) {
+  if (!text) return null;
+  // Strip code fences if any
+  let t = text.trim();
+  if (t.startsWith('```
+    t = t.replace(/^```json/i, '').replace(/^``````$/, '').trim();
+  }
+  // Find first { ... } block
+  const start = t.indexOf('{');
+  const end = t.lastIndexOf('}');
+  if (start >= 0 && end > start) {
+    const candidate = t.slice(start, end + 1);
+    try {
+      return JSON.parse(candidate);
+    } catch (_) { /* ignore */ }
+  }
+  // Fallback straight parse
+  try { return JSON.parse(t); } catch (_) { return null; }
+}
+
+// Strong rule-based fallback aligned to JH-HLM and safety rules
+function getRuleBasedPlan(patient) {
+  const latestObs = patient.latestObservation || {
+    mobilityLevel: 1, ponv: 'Tidak ada keluhan', rass: '0: Alert & Calm', painScale: 0, notes: ''
+  };
+  const hoursPostOp = getHoursSince(patient.surgeryFinishTime);
+  const flags = classifyStability(patient, latestObs, hoursPostOp);
+  const cur = Math.min(8, Math.max(1, Number(latestObs.mobilityLevel) || 1));
+  const { minTarget, maxTarget } = computeAllowedRange(cur, flags);
+
+  // Choose conservative within allowed range when unstable, otherwise highest allowed
+  const targetLevel = flags.unstable ? minTarget : maxTarget;
+  const suggestion = levelSuggestion(targetLevel, flags);
+
+  return {
+    targetLevel,
+    targetText: HLM_LABELS[targetLevel],
+    suggestion
+  };
+}
+
+async function getAIPlan(patient) {
+  const latestObs = patient.latestObservation || {
+    mobilityLevel: 1,
+    ponv: 'Tidak ada keluhan',
+    rass: '0: Alert & Calm',
+    painScale: 0,
+    notes: ''
+  };
+
+  const hoursPostOp = getHoursSince(patient.surgeryFinishTime);
+  const flags = classifyStability(patient, latestObs, hoursPostOp);
+  const curLevel = Math.min(8, Math.max(1, Number(latestObs.mobilityLevel) || 1));
+  const { minTarget, maxTarget } = computeAllowedRange(curLevel, flags);
+
+  // Build structured instruction with explicit JSON schema and guardrails
+  const systemPrompt =
+    "Anda adalah perawat klinis ahli pemulihan pasca-operasi di Indonesia. " +
+    "Tugas Anda: tentukan target mobilisasi JH-HLM yang aman dan progresif, dengan prioritas keselamatan. " +
+    "Kembalikan HANYA JSON dengan kunci persis: targetLevel (integer 1-8), targetText (string 'Level X'), suggestion (string, Bahasa Indonesia, singkat-aksi). " +
+    "Aturan: Jika RASS ≠ 0, nyeri >3/10, PONV aktif, atau masih dalam efek anestesi spinal dini, pilih target konservatif dalam rentang diizinkan. " +
+    "Jika stabil, dorong naik 1 level dari capaian saat ini. Jangan sertakan penjelasan di luar JSON.";
+
+  const userPayload = {
+    patient: {
+      age: patient.age,
+      gender: patient.gender,
+      operation: patient.operation,
+      anesthesia: patient.anesthesia,
+      surgeryFinishTime: patient.surgeryFinishTime,
+      hoursPostOp: Number.isFinite(hoursPostOp) ? Number(hoursPostOp.toFixed(1)) : null
+    },
+    latestObservation: {
+      mobilityLevel: curLevel,
+      ponv: latestObs.ponv,
+      rass: latestObs.rass,
+      painScale: latestObs.painScale,
+      notes: latestObs.notes || ''
+    },
+    // Guardrails for model
+    policy: {
+      allowedTargetMin: minTarget,
+      allowedTargetMax: maxTarget,
+      hlmDefinitions: {
+        1: "Berbaring",
+        2: "Aktivitas di tempat tidur",
+        3: "Duduk tepi tempat tidur",
+        4: "Transfer ke kursi/commode",
+        5: "Berdiri ≥1 menit",
+        6: "Jalan ≥10 langkah",
+        7: "Jalan ≥7,5 m",
+        8: "Jalan ≥75 m"
+      }
+    },
+    outputSchema: {
+      type: "object",
+      required: ["targetLevel", "targetText", "suggestion"],
+      properties: {
+        targetLevel: { type: "integer", minimum: 1, maximum: 8 },
+        targetText: { type: "string" },
+        suggestion: { type: "string" }
+      }
+    }
+  };
+
+  const apiKey = ""; // <-- isi API key
+  const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+
+  // Timeout + retry
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15000);
+
+  const payload = {
+    contents: [
+      { parts: [{ text: JSON.stringify(userPayload) }] }
+    ],
+    systemInstruction: { parts: [{ text: systemPrompt }] },
+    generationConfig: {
+      responseMimeType: "application/json",
+      temperature: 0.2,
+      topK: 32,
+      topP: 0.9,
+      maxOutputTokens: 200
+    }
+  };
+
+  try {
+    if (!apiKey) throw new Error("Missing API key");
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      signal: controller.signal
+    });
+    clearTimeout(timeout);
+
+    if (!response.ok) {
+      console.error("AI API Error:", response.status, response.statusText);
+      throw new Error('AI response not OK');
+    }
+
+    const result = await response.json();
+    const raw = result?.candidates?.?.content?.parts?.?.text || "";
+    const parsed = extractJson(raw);
+
+    // Validate and normalize
+    let out = parsed && typeof parsed === 'object' ? parsed : null;
+    if (out) {
+      let tLvl = parseInt(out.targetLevel, 10);
+      if (!Number.isFinite(tLvl)) throw new Error('Invalid targetLevel');
+      // Enforce guardrail range
+      tLvl = Math.max(minTarget, Math.min(maxTarget, tLvl));
+      tLvl = Math.max(1, Math.min(8, tLvl));
+      const tText = `Level ${tLvl}`;
+      const sugg = String(out.suggestion || '').trim();
+      const final = {
+        targetLevel: tLvl,
+        targetText: tText,
+        suggestion: sugg || levelSuggestion(tLvl, classifyStability(patient, latestObs, hoursPostOp))
+      };
+      return final;
+    }
+
+    throw new Error('Invalid JSON response from AI');
+  } catch (error) {
+    console.warn("AI recommendation failed, falling back to rule-based logic.", error);
+    clearTimeout(timeout);
+    return getRuleBasedPlan(patient);
+  }
+}
+
 
 function getRuleBasedPlan(patient) {
     const latestObs = patient.latestObservation || { mobilityLevel: 1, ponv: 'Tidak ada keluhan', rass: '0: Alert & Calm', painScale: 0 };

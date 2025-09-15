@@ -325,14 +325,23 @@ function getSecondsFromTS(ts) {
 }
 
 function formatPostOpDuration(timestamp) {
-    const totalMinutes = Math.floor((Date.now() - timestamp) / (1000 * 60));
-    if (totalMinutes < 0) return 'Baru saja';
-    if (totalMinutes < 60) return `${totalMinutes} mnt`;
+    // 1. Hitung total jam sejak operasi selesai
+    const totalHours = Math.floor((Date.now() - timestamp) / (1000 * 60 * 60));
     
-    const hours = Math.floor(totalMinutes / 60);
-    const minutes = totalMinutes % 60;
+    // Jika waktu belum berlalu, tampilkan 'Baru saja'
+    if (totalHours < 1) return 'kurang dari 1 jam';
     
-    return `${hours} jam ${minutes} mnt`;
+    // 2. Jika kurang dari 24 jam, tampilkan dalam format jam saja
+    if (totalHours < 24) {
+        return `${totalHours} jam`;
+    }
+    
+    // 3. Jika lebih dari 24 jam, hitung hari dan sisa jamnya
+    const days = Math.floor(totalHours / 24);
+    const hours = totalHours % 24;
+    
+    // 4. Kembalikan dalam format "X hari Y jam"
+    return `${days} hari ${hours} jam`;
 }
 
 

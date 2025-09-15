@@ -18,7 +18,7 @@ const appData = {
         {level: 5, name: "Level 5: Transfer ke Kursi & Berjalan > 10 Langkah", description: "Mampu pindah ke kursi dan/atau berjalan lebih dari 10 langkah."},
         {level: 6, name: "Level 6: Berjalan > 7 Meter", description: "Berjalan mandiri dengan atau tanpa alat bantu sejauh lebih dari 7 meter."},
         {level: 7, name: "Level 7: Berjalan > 30 Meter", description: "Berjalan mandiri dengan atau tanpa alat bantu sejauh lebih dari 30 meter."},
-        {level: 8, name: "Level 8: Naik Turun Tangga", description: "Mampu naik/turun setidaknya satu anak tangga."}
+        {level: 8, name: "Level 8: Naik Turun Tangga atau berjalan > 75 Meter", description: "Mampu naik/turun setidaknya satu anak tangga atau Berjalan Mandiri lebih dari 75 meter."}
     ],
     questionnaire: {
         questions: [

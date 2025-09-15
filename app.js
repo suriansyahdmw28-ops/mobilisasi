@@ -192,7 +192,7 @@ function listenForPatientUpdates() {
     const q = query(collection(db, collectionPath));
     
     const tableBody = document.getElementById('patient-table-body');
-    if (tableBody) tableBody.innerHTML = `<tr><td colspan="9" class="text-center p-5"><i class="fas fa-spinner fa-spin"></i> Memuat data pasien...</td></tr>`;
+    if (tableBody) tableBody.innerHTML = `<tr><td colspan="10" class="text-center p-5"><i class="fas fa-spinner fa-spin"></i> Memuat data pasien...</td></tr>`;
     
     onSnapshot(q, async snapshot => {
         allPatientsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -205,7 +205,7 @@ function listenForPatientUpdates() {
     }, error => {
         console.error("Error listening to patient updates:", error);
         showToast("Gagal memuat data pasien.", "error");
-        if (tableBody) tableBody.innerHTML = `<tr><td colspan="9" class="text-center p-5 text-red-500"><i class="fas fa-exclamation-triangle"></i> Gagal memuat data.</td></tr>`;
+        if (tableBody) tableBody.innerHTML = `<tr><td colspan="10" class="text-center p-5 text-red-500"><i class="fas fa-exclamation-triangle"></i> Gagal memuat data.</td></tr>`;
     });
 }
 
@@ -503,14 +503,23 @@ async function renderPatientTable(patients) {
     const tableBody = document.getElementById('patient-table-body');
     if (!tableBody) return;
     if (patients.length === 0) {
-        tableBody.innerHTML = `<tr class="no-data-row"><td colspan="9">Belum ada data pasien aktif. Klik 'Tambah Pasien Baru' untuk memulai.</td></tr>`;
+        tableBody.innerHTML = `<tr class="no-data-row"><td colspan="10">Belum ada data pasien aktif. Klik 'Tambah Pasien Baru' untuk memulai.</td></tr>`;
         return;
     }
 
-    const patientPromises = patients.map(p => {
-        const latestObs = p.latestObservation || { ponv: 'N/A', rass: 'N/A', mobilityLevel: 1 };
+    const patientRowsHTML = patients.map(p => {
+        const latestObs = p.latestObservation || { ponv: 'N/A', rass: 'N/A', mobilityLevel: 1, painScale: 'N/A' };
         const finishSeconds = getSecondsFromTS(p.surgeryFinishTime);
         const finishTimestamp = finishSeconds * 1000;
+        
+        const painScore = latestObs.painScale;
+        let painClass = 'status-level-5'; // Default Green for 0
+        if (painScore > 3) {
+            painClass = 'status-level-1'; // Red for > 3
+        } else if (painScore > 0) {
+            painClass = 'status-level-2'; // Yellow for 1-3
+        }
+
         return `
             <tr data-patient-id="${p.id}">
                 <td><strong>${p.name}</strong><br><small>${p.rm}</small></td>
@@ -519,6 +528,7 @@ async function renderPatientTable(patients) {
                 <td>${p.anesthesia}</td>
                 <td class="post-op-time" data-timestamp="${finishTimestamp}">${formatPostOpDuration(finishTimestamp)}</td>
                 <td><small><strong>PONV:</strong> ${latestObs.ponv}<br><strong>RASS:</strong> ${latestObs.rass}</small></td>
+                <td><span class="status ${painClass}">${painScore}/10</span></td>
                 <td><span class="status status-level-${latestObs.mobilityLevel}">Level ${latestObs.mobilityLevel}</span></td>
                 <td class="target-cell"><div class="loading-state"><i class="fas fa-spinner fa-spin"></i> AI...</div></td>
                 <td class="suggestion-cell">
@@ -534,7 +544,7 @@ async function renderPatientTable(patients) {
                 </td>
             </tr>`;
     });
-    tableBody.innerHTML = patientPromises.join('');
+    tableBody.innerHTML = patientRowsHTML.join('');
 
     for (const patient of patients) {
         getAIPlan(patient).then(plan => {
@@ -561,8 +571,8 @@ async function getAIPlan(patient) {
 
     const systemPrompt = `Anda adalah seorang perawat klinis ahli pemulihan pasca-operasi di sebuah rumah sakit di Indonesia. Tugas Anda adalah memberikan rekomendasi mobilisasi dini yang aman dan efektif. Berikan jawaban HANYA dalam format JSON.
     Format JSON harus berisi tiga kunci: "targetLevel" (angka integer antara 1-8), "targetText" (string, contoh: "Level 4"), dan "suggestion" (string dalam Bahasa Indonesia, singkat, jelas, dan berorientasi pada tindakan untuk perawat).
-    Analisis data pasien berikut dan tentukan target serta saran yang paling sesuai. Pertimbangkan semua faktor secara holistik (umur, jenis kelamin, jenis operasi, anestesi, lama post-op, skala nyeri, ponv, rass, catatan tambahan, dll).
-    - Prioritaskan keamanan: Jika ada nyeri, PONV, RASS yang tidak stabil (skor selain 0), atau efek anestesi spinal, target harus konservatif.
+    Analisis data pasien berikut dan tentukan target serta saran yang paling sesuai. Pertimbangkan semua faktor secara holistik (umur, jenis kelamin, jenis operasi, anestesi, lama post-op, ponv, rass, catatan tambahan, dll).
+    - Prioritaskan keamanan: Jika ada PONV, RASS yang tidak stabil (skor selain 0), atau efek anestesi spinal, target harus konservatif.
     - Bersikap progresif: Jika pasien stabil, dorong ke level berikutnya.
     - Berikan saran yang spesifik dan dapat ditindaklanuti.`;
 
@@ -666,16 +676,16 @@ function openPatientModal(patientId = null) {
     ].map(opt => `<option value="${opt}">${opt}</option>`).join('');
 
     const rassOptions = [
-        { value: "Combative", text: "Combative (Sangat melawan)" },
-        { value: "Very Agitated", text: "Very Agitated (Sangat gelisah, agresif)" },
-        { value: "Agitated", text: "Agitated (Gelisah, gerakan tanpa tujuan)" },
-        { value: "Restless", text: "Restless (Gelisah, tidak agresif)" },
-        { value: "Alert & Calm", text: "Alert & Calm (Terjaga dan tenang)" },
-        { value: "Drowsy", text: "Drowsy (Mengantuk, respon >10d)" },
-        { value: "Light Sedation", text: "Light Sedation (Sedasi ringan, respon <10d)" },
-        { value: "Moderate Sedation", text: "Moderate Sedation (Sedasi sedang, respon suara)" },
-        { value: "Deep Sedation", text: "Deep Sedation (Sedasi dalam, respon fisik)" },
-        { value: "Unarousable", text: "Unarousable (Tidak ada respon)" }
+        { value: "+4: Combative", text: "+4: Combative (Sangat melawan)" },
+        { value: "+3: Very Agitated", text: "+3: Very Agitated (Sangat gelisah, agresif)" },
+        { value: "+2: Agitated", text: "+2: Agitated (Gelisah, gerakan tanpa tujuan)" },
+        { value: "+1: Restless", text: "+1: Restless (Gelisah, tidak agresif)" },
+        { value: "0: Alert & Calm", text: "0: Alert & Calm (Terjaga dan tenang)" },
+        { value: "-1: Drowsy", text: "-1: Drowsy (Mengantuk, respon >10d)" },
+        { value: "-2: Light Sedation", text: "-2: Light Sedation (Sedasi ringan, respon <10d)" },
+        { value: "-3: Moderate Sedation", text: "-3: Moderate Sedation (Sedasi sedang, respon suara)" },
+        { value: "-4: Deep Sedation", text: "-4: Deep Sedation (Sedasi dalam, respon fisik)" },
+        { value: "-5: Unarusable", text: "-5: Unarusable (Tidak ada respon)" }
     ].map(opt => `<option value="${opt.value}">${opt.text}</option>`).join('');
 
     const addForm = `
@@ -838,7 +848,7 @@ function renderPatientDashboardAnalysis(data) {
                 <canvas id="age-gender-chart"></canvas>
             </div>
              <div class="chart-container full-span">
-                <h4>Dampak Hambatan (Nyeri/PONV/RASS) Terhadap Pencapaian Target</h4>
+                <h4>Dampak Hambatan (PONV/RASS/Nyeri) Terhadap Pencapaian Target</h4>
                 <canvas id="barrier-impact-chart"></canvas>
             </div>
         </div>
@@ -849,7 +859,7 @@ function renderPatientDashboardAnalysis(data) {
                 <li><strong>Progres vs. Target (Grafik 1):</strong> Grafik ini adalah indikator utama keberhasilan program. Idealnya, garis 'Level Aktual' harus selalu mendekati atau bahkan melampaui garis 'Target Level' seiring berjalannya hari pasca-operasi (POD). Jarak yang lebar antara kedua garis mungkin mengindikasikan adanya tantangan sistemik.</li>
                 <li><strong>Faktor Klinis (Grafik 2):</strong> Grafik ini membandingkan dampak gabungan dari jenis operasi dan anestesi. Misalnya, Anda mungkin menemukan bahwa pasien 'Operasi Mayor' dengan 'Anestesi Spinal' memiliki progres paling lambat, yang menandakan bahwa kelompok ini memerlukan perhatian dan strategi mobilisasi khusus.</li>
                 <li><strong>Faktor Demografis (Grafik 3):</strong> Dengan membandingkan kelompok umur dan jenis kelamin, kita dapat mengidentifikasi populasi berisiko. Jika pasien 'Usia > 60' secara konsisten menunjukkan level mobilisasi yang lebih rendah, ini bisa menjadi dasar untuk mengembangkan protokol mobilisasi geriatri.</li>
-                <li><strong>Hambatan Utama (Grafik 4):</strong> Grafik ini secara kuantitatif menunjukkan 'biang keladi' dari kegagalan pencapaian target. Persentase keberhasilan yang jauh lebih rendah pada kelompok 'Dengan Hambatan' adalah bukti kuat bahwa manajemen Nyeri, PONV dan RASS yang efektif merupakan prasyarat mutlak untuk keberhasilan mobilisasi.</li>
+                <li><strong>Hambatan Utama (Grafik 4):</strong> Grafik ini secara kuantitatif menunjukkan 'biang keladi' dari kegagalan pencapaian target. Persentase keberhasilan yang jauh lebih rendah pada kelompok 'Dengan Hambatan' adalah bukti kuat bahwa manajemen nyeri, PONV, dan RASS yang efektif merupakan prasyarat mutlak untuk keberhasilan mobilisasi.</li>
             </ul>
         </div>
     `;
@@ -1054,3 +1064,4 @@ function showConfirmationDialog(message, onConfirm) {
     };
     document.getElementById('confirm-cancel').onclick = closeDialog;
 }
+

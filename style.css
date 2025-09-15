@@ -190,13 +190,14 @@ p:last-child { margin-bottom: 0; }
 .patient-table th:nth-child(1), .patient-table td:nth-child(1) { width: 15%; min-width: 170px; } 
 .patient-table th:nth-child(2), .patient-table td:nth-child(2) { width: 8%; min-width: 80px; } 
 .patient-table th:nth-child(7), .patient-table td:nth-child(7) { width: 5%; min-width: 60px; text-align: center; }
-.patient-table th:nth-child(10), .patient-table td:nth-child(10) { width: 26%; min-width: 260px; white-space: normal; } 
+.patient-table th:nth-child(9), .patient-table td:nth-child(9) { width: 26%; min-width: 260px; white-space: normal; } 
 
 .suggestion-text {
     white-space: normal;
     font-size: var(--font-size-sm);
     line-height: 1.5;
     max-width: none;
+    cursor: help; /* Menunjukkan ada tooltip */
 }
 /* Style untuk loading state dan AI badge */
 .loading-state {

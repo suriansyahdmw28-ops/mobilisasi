@@ -559,12 +559,22 @@ async function renderPatientTable(patients) {
                 const suggestionCell = row.querySelector('.suggestion-cell');
                 
                 const targetLevelInfo = appData.mobilityScale.find(l => l.level === plan.targetLevel) || { name: plan.targetText };
-                targetCell.innerHTML = `<span class="status status-level-${plan.targetLevel}" title="${targetLevelInfo.name}">${plan.targetText}</span>`;
+                targetCell.innerHTML = `<span class="status status-level-${plan.targetLevel}" title="Target: ${targetLevelInfo.name}\nTimeline: ${plan.targetTimeline}">${plan.targetText}</span>`;
                 
                 suggestionCell.querySelector('.loading-state').style.display = 'none';
                 const content = suggestionCell.querySelector('.suggestion-content');
                 const suggestionTextElement = content.querySelector('.suggestion-text');
-                suggestionTextElement.innerHTML = `${plan.suggestion} <span class="ai-badge">✨ AI</span>`;
+
+                let suggestionsHTML = `<strong>${plan.primarySuggestion}</strong>`;
+                if (plan.secondarySuggestions && plan.secondarySuggestions.length > 0) {
+                    suggestionsHTML += `<ul style="margin-top: 8px; padding-left: 18px; margin-bottom: 0;">`;
+                    plan.secondarySuggestions.forEach(sug => {
+                        suggestionsHTML += `<li><small>${sug}</small></li>`;
+                    });
+                    suggestionsHTML += `</ul>`;
+                }
+
+                suggestionTextElement.innerHTML = `${suggestionsHTML} <span class="ai-badge">✨ AI</span>`;
                 suggestionTextElement.title = `Rasional AI: ${plan.rationale}`;
                 content.style.display = 'block';
             }
@@ -577,19 +587,45 @@ async function getAIPlan(patient) {
     const latestObs = patient.latestObservation || { mobilityLevel: 1, ponv: 'Tidak ada keluhan', rass: '0: Alert & Calm', painScale: 0, notes: '' };
     const hoursPostOp = (Date.now() - (getSecondsFromTS(patient.surgeryFinishTime) * 1000)) / (3600 * 1000);
 
-    const systemPrompt = `Anda adalah seorang Perawat Spesialis Pemulihan Dini Pasca Operasi (ERAS - Enhanced Recovery After Surgery) di sebuah rumah sakit terkemuka di Indonesia. Tugas Anda adalah memberikan rekomendasi klinis yang sangat spesifik, aman, dan berorientasi pada tindakan untuk mobilisasi dini pasien. Jawaban WAJIB dalam format JSON.
+    const systemPrompt = `Anda adalah seorang Perawat Klinis Spesialis program ERAS (Enhanced Recovery After Surgery) di Indonesia. Tugas Anda adalah memberikan rencana mobilisasi dini yang sangat presisi, aman, dan dapat ditindaklanjuti. Jawaban WAJIB dalam format JSON.
 
-    Format JSON harus berisi empat kunci:
-    1. "targetLevel" (integer): Level mobilisasi (1-8) yang realistis untuk dicapai dalam 12 jam ke depan.
-    2. "targetText" (string): Teks target, contoh: "Level 4: Jalan di Tempat".
-    3. "suggestion" (string): Saran UTAMA untuk perawat, singkat, jelas, dan dapat ditindaklanjuti. WAJIB dimulai dengan kata kerja (Contoh: "Bantu pasien...", "Kolaborasi untuk...", "Lakukan asesmen...").
-    4. "rationale" (string): Alasan klinis singkat di balik saran Anda. Jelaskan MENGAPA target dan saran ini dipilih berdasarkan data pasien.
-
-    ATURAN PENTING:
-    - KESELAMATAN ADALAH UTAMA: Jika skala nyeri > 4, ada keluhan PONV (selain 'tidak ada'), atau RASS bukan '0', maka saran pertama HARUS berfokus pada penanganan masalah tersebut (misal: "Kolaborasi untuk manajemen nyeri..."). Target mobilisasi tidak boleh dinaikkan jika ada hambatan ini.
-    - SPESIFIK & TERUKUR: Hindari saran umum. Alih-alih "motivasi pasien", berikan "Bantu pasien duduk di tepi bed selama 15 menit, 2 kali sebelum jam makan siang."
-    - HOLISTIK: Pertimbangkan semua data. Operasi mayor (Laparotomi, ORIF) memerlukan pendekatan yang lebih hati-hati. Anestesi spinal membatasi mobilisasi dalam 8-12 jam pertama. Usia lanjut (>60 tahun) mungkin perlu waktu pemulihan lebih lama.
-    - PROGRESIF: Jika pasien stabil (nyeri <= 4, tidak ada PONV, RASS 0), dorong pasien untuk naik satu level dari level saat ini.`;
+    Format JSON yang diminta:
+    {
+      "targetLevel": integer,
+      "targetText": string,
+      "targetTimeline": string,
+      "primarySuggestion": string,
+      "secondarySuggestions": [string],
+      "rationale": string
+    }
+    
+    IKUTI ATURAN PENGAMBILAN KEPUTUSAN BERIKUT SECARA BERURUTAN:
+    
+    ATURAN 1: PROTOKOL KEAMANAN (RED FLAGS). Cek kondisi berikut:
+    - Nyeri (Skala NRS) > 4
+    - PONV (Mual/Muntah) bukan "Tidak ada keluhan"
+    - RASS (Tingkat Kesadaran) bukan "0: Alert & Calm"
+    - Anestesi Spinal/Epidural dan Waktu Pasca-Operasi < 12 jam
+    
+    Jika SALAH SATU kondisi di atas terpenuhi:
+    - "targetLevel" WAJIB SAMA DENGAN Level Saat Ini. JANGAN menaikkan level.
+    - "targetTimeline": "Hingga kondisi stabil".
+    - "primarySuggestion" WAJIB berfokus pada penyelesaian red flag tersebut. Contoh: "Kolaborasi dengan dokter untuk optimalisasi analgesik (nyeri > 4)", "Berikan antiemetik sesuai advis dan monitor respon (ada PONV)", "Lanjutkan observasi RASS hingga kembali ke 0 (RASS abnormal)", "Pertahankan tirah baring, monitor sensori/motorik pulih sepenuhnya (efek spinal)".
+    - "secondarySuggestions": Berikan 1-2 saran yang mendukung kondisi saat ini, seperti "Anjurkan latihan rentang gerak aktif/pasif di tempat tidur" atau "Pastikan hidrasi adekuat".
+    - "rationale": Jelaskan red flag yang teridentifikasi sebagai alasan utama.
+    
+    ATURAN 2: PROTOKOL PROGRESI (Jika TIDAK ADA Red Flags).
+    - Tentukan "targetLevel" berdasarkan matriks berikut (pilih yang paling sesuai, naikkan SATU level dari saat ini jika memungkinkan):
+      - Operasi Ringan (Appendectomy, Hernia) & < 12 jam post-op: Target Level 3 (Berdiri)
+      - Operasi Ringan & > 12 jam post-op: Target Level 4 (Jalan di tempat) atau 5 (Jalan >10 langkah)
+      - Operasi Mayor Abdomen (Laparotomi) & < 24 jam post-op: Target Level 2 (Duduk)
+      - Operasi Mayor Abdomen & > 24 jam post-op: Target Level 3 (Berdiri) atau 4 (Jalan di tempat)
+      - Operasi Ortopedi (ORIF/ROI): Target sangat bergantung pada instruksi dokter/fisioterapi. Jika tidak ada catatan, target konservatif adalah Level 2 (Duduk) atau 3 (Berdiri tanpa menumpu berat badan).
+      - Usia > 65 tahun: Gunakan target yang lebih konservatif (misal, target untuk <12 jam diterapkan untuk <24 jam).
+    - "targetTimeline": Tentukan waktu yang realistis (Contoh: "Dalam 8 jam ke depan", "Sebelum jam makan siang", "Pada shift sore ini").
+    - "primarySuggestion": Buat saran yang SANGAT SPESIFIK dan TERUKUR untuk mencapai target. Contoh: "Bantu pasien berdiri di samping tempat tidur selama 2 menit, ulangi 3 kali sebelum pukul 15:00." atau "Dampingi pasien berjalan 15 langkah dari tempat tidur ke arah pintu."
+    - "secondarySuggestions": Berikan 2-3 saran pendukung yang relevan. Pilih dari daftar ini: "Edukasi pasien tentang teknik batuk efektif", "Libatkan keluarga untuk memberi dukungan moril", "Perhatikan posisi drain/kateter saat bergerak", "Observasi tanda-tanda hipotensi ortostatik saat perubahan posisi", "Pastikan bel dan barang pribadi dalam jangkauan pasien", "Jelaskan manfaat setiap tahapan mobilisasi kepada pasien".
+    - "rationale": Jelaskan mengapa target tersebut sesuai berdasarkan jenis operasi, waktu pasca-op, dan status stabil pasien.`;
 
     const userQuery = `
     Data Pasien:
@@ -634,8 +670,7 @@ async function getAIPlan(patient) {
         
         if (jsonString) {
             const parsedJson = JSON.parse(jsonString);
-            if (parsedJson.targetLevel && parsedJson.targetText && parsedJson.suggestion && parsedJson.rationale) {
-                // Pastikan targetText sesuai dengan scale
+            if (parsedJson.targetLevel && parsedJson.targetText && parsedJson.primarySuggestion && parsedJson.rationale) {
                 const scaleInfo = appData.mobilityScale.find(s => s.level === parsedJson.targetLevel);
                 if (scaleInfo) parsedJson.targetText = `Level ${scaleInfo.level}`;
                 return parsedJson;
@@ -656,56 +691,62 @@ function getRuleBasedPlan(patient) {
     const majorOps = ['Laparotomy', 'Mastectomy', 'ORIF', 'ROI'];
     const isMajorOp = majorOps.some(op => patient.operation.includes(op));
 
-    let targetLevel = currentLevel;
-    let suggestion = "";
-    let rationale = "";
+    let plan = {
+        targetLevel: currentLevel,
+        targetTimeline: "Hingga kondisi stabil",
+        primarySuggestion: "",
+        secondarySuggestions: [],
+        rationale: ""
+    };
 
-    // Cek hambatan
+    // ATURAN 1: Red Flags
     if (latestObs.painScale > 4) {
-        suggestion = "Kolaborasi untuk manajemen nyeri. Lakukan asesmen ulang nyeri 30 menit setelah intervensi.";
-        rationale = "Nyeri > 4 menghambat partisipasi pasien. Mobilisasi ditunda sampai nyeri terkontrol.";
+        plan.primarySuggestion = "Kolaborasi untuk manajemen nyeri.";
+        plan.secondarySuggestions = ["Lakukan asesmen ulang nyeri 30 menit setelah intervensi."];
+        plan.rationale = "Nyeri > 4 menghambat partisipasi pasien. Mobilisasi ditunda sampai nyeri terkontrol.";
     } else if (latestObs.ponv !== 'Tidak ada keluhan') {
-        suggestion = "Atasi mual/muntah sesuai advis medis. Pastikan hidrasi cukup.";
-        rationale = "PONV meningkatkan risiko dehidrasi dan kelelahan. Stabilkan kondisi sebelum mobilisasi.";
+        plan.primarySuggestion = "Atasi mual/muntah sesuai advis medis.";
+        plan.secondarySuggestions = ["Pastikan hidrasi cukup."];
+        plan.rationale = "PONV meningkatkan risiko dehidrasi dan kelelahan. Stabilkan kondisi sebelum mobilisasi.";
     } else if (!latestObs.rass.startsWith('0:')) {
-        suggestion = "Observasi tingkat kesadaran. Laporkan jika RASS tidak kembali ke 0.";
-        rationale = "Pasien harus sadar penuh (RASS 0) untuk dapat mengikuti instruksi mobilisasi dengan aman.";
-    } else if (patient.anesthesia.toLowerCase().includes('spinal') && hoursPostOp < 10) {
-        targetLevel = 1;
-        suggestion = "Fokus pada miring kanan/kiri setiap 2 jam. Awasi tanda-tanda vital dan sensasi motorik ekstremitas bawah.";
-        rationale = `Efek anestesi spinal masih berpengaruh dalam 10 jam pertama, batasi mobilisasi di tempat tidur.`;
+        plan.primarySuggestion = "Observasi tingkat kesadaran.";
+        plan.secondarySuggestions = ["Laporkan jika RASS tidak kembali ke 0."];
+        plan.rationale = "Pasien harus sadar penuh (RASS 0) untuk dapat mengikuti instruksi mobilisasi dengan aman.";
+    } else if (patient.anesthesia.toLowerCase().includes('spinal') && hoursPostOp < 12) {
+        plan.targetLevel = 1;
+        plan.primarySuggestion = "Fokus pada miring kanan/kiri setiap 2 jam.";
+        plan.secondarySuggestions = ["Awasi tanda-tanda vital dan sensori motorik ekstremitas bawah."];
+        plan.rationale = `Efek anestesi spinal masih berpengaruh dalam 12 jam pertama, batasi mobilisasi di tempat tidur.`;
     } else {
-        // Jika tidak ada hambatan, tentukan target
+        // ATURAN 2: Progresi
+        plan.targetTimeline = "Dalam 8-12 jam";
         let nextLevel = currentLevel + 1;
+        
+        let calculatedTarget = currentLevel;
         if (isMajorOp) {
-             // Progresi lebih lambat untuk operasi besar
-            if (hoursPostOp < 24) targetLevel = Math.min(nextLevel, 3);
-            else targetLevel = Math.min(nextLevel, 5);
+            if (hoursPostOp < 24) calculatedTarget = 2; else calculatedTarget = 3;
         } else {
-            // Progresi standar
-            if (hoursPostOp < 12) targetLevel = Math.min(nextLevel, 3);
-            else if (hoursPostOp < 24) targetLevel = Math.min(nextLevel, 4);
-            else targetLevel = Math.min(nextLevel, 6);
+            if (hoursPostOp < 12) calculatedTarget = 3; else calculatedTarget = 4;
         }
-        targetLevel = Math.min(targetLevel, 8); // Batas atas
+        
+        plan.targetLevel = Math.min(nextLevel, calculatedTarget, 8);
 
-        if (targetLevel > currentLevel) {
-            suggestion = `Bantu pasien untuk mencapai Level ${targetLevel}. Lakukan secara bertahap dan observasi respon pasien.`;
-            rationale = `Pasien stabil dan tidak ada kontraindikasi. Progresi ke level selanjutnya dianjurkan untuk mempercepat pemulihan.`;
+        if (plan.targetLevel > currentLevel) {
+            plan.primarySuggestion = `Bantu pasien untuk mencapai Level ${plan.targetLevel} secara bertahap.`;
+            plan.secondarySuggestions = ["Observasi respon pasien terhadap perubahan posisi.", "Edukasi pentingnya mobilisasi."];
+            plan.rationale = `Pasien stabil. Progresi ke level selanjutnya dianjurkan untuk mempercepat pemulihan.`;
         } else {
-            suggestion = `Pertahankan Level ${currentLevel}. Lanjutkan observasi dan dorong latihan aktif di level saat ini.`;
-            rationale = `Pasien sudah mencapai target untuk fase ini atau ada faktor (misal: op mayor) yang membutuhkan pendekatan konservatif.`;
+            plan.primarySuggestion = `Pertahankan Level ${currentLevel} dan dorong latihan aktif.`;
+            plan.secondarySuggestions = ["Observasi TTV sebelum & sesudah latihan."];
+            plan.rationale = `Pasien sudah mencapai target untuk fase ini. Fokus pada penguatan di level saat ini.`;
         }
     }
 
-    const scaleInfo = appData.mobilityScale.find(s => s.level === targetLevel);
+    const scaleInfo = appData.mobilityScale.find(s => s.level === plan.targetLevel);
+    plan.targetText = `Level ${plan.targetLevel}`;
+    plan.primarySuggestion += ' <span class="ai-badge fallback">Fallback</span>';
 
-    return {
-        targetLevel: targetLevel,
-        targetText: `Level ${targetLevel}`,
-        suggestion: suggestion + ' <span class="ai-badge fallback">Fallback</span>',
-        rationale: rationale,
-    };
+    return plan;
 }
 
 
@@ -762,7 +803,10 @@ function openPatientModal(patientId = null) {
         
     const updateForm = `
         <h4>Pasien: ${patient?.name} (${patient?.rm})</h4>
-        <p class="patient-info-subtitle">${patient?.age} tahun, ${patient?.gender}</p>
+        <div class="patient-info-details">
+            <span><strong>Usia:</strong> ${patient?.age} tahun</span>
+            <span><strong>Jenis Kelamin:</strong> ${patient?.gender}</span>
+        </div>
         <hr class="form-divider">
         <div class="modal-grid">
             <div class="form-group full-width"><label>Update Skala Mobilitas (JH-HLM)</label><select id="update-mobility" class="form-control">${appData.mobilityScale.map(s=>`<option value="${s.level}">${s.name}</option>`).join('')}</select></div>
@@ -1108,3 +1152,4 @@ function showConfirmationDialog(message, onConfirm) {
     };
     document.getElementById('confirm-cancel').onclick = closeDialog;
 }
+

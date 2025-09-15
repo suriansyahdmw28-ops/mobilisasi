@@ -7,7 +7,7 @@ import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gsta
 
 // --- KONFIGURASI APLIKASI ---
 const appData = {
-    nurses: ["Suriansyah, S.Kep., Ns", "Akbar Wirahadi, A.Md.Kep", "Annisa Aulia Rahma, A.Md.Kep", "Dina Ghufriana, S.Kep.Ners", "Dwi Sucilowati, AMK", "Gusti Rusmiyati, S.Kep.Ners", "Herliyana Paramitha, S.Kep.,Ners", "Isnawati, AMK", "Khairun Nisa, S.Kep.Ners", "Noor Makiah, AMK", "Nurmilah A, A.Md.Kep", "Qatrunnada Mufidah, A.Md.Kep", "Raudatul Hikmah, S.Kep., Ns", "Verawaty, AMK", "Zahratul Zannah, S.Kep., Ns"],
+    nurses: ["Akbar Wirahadi, A.Md.Kep", "Annisa Aulia Rahma, A.Md.Kep", "Dina Ghufriana, S.Kep.Ners", "Dwi Sucilowati, AMK", "Gusti Rusmiyati, S.Kep.Ners", "Herliyana Paramitha, S.Kep.,Ners", "Isnawati, AMK", "Khairun Nisa, S.Kep.Ners", "Noor Makiah, AMK", "Nurmilah A, A.Md.Kep", "Qatrunnada Mufidah, A.Md.Kep", "Raudatul Hikmah, S.Kep., Ns", "Suriansyah, S.Kep., Ns",  "Verawaty, AMK", "Zahratul Zannah, S.Kep., Ns"],
     operations: ["Appendectomy", "Hernia Repair", "Laparotomy", "Mastectomy", "BPH", "Excision", "Debridement", "ORIF", "ROI", "Lainnya..."],
     anesthesiaTypes: ["General Anesthesia", "Spinal Anesthesia", "Epidural Anesthesia", "Regional Block"],
     mobilityScale: [
@@ -16,9 +16,9 @@ const appData = {
         {level: 3, name: "Level 3: Berdiri", description: "Pasien mampu berdiri di samping tempat tidur setidaknya selama 1 menit."},
         {level: 4, name: "Level 4: Berjalan di Tempat", description: "Pasien mampu melangkah di tempat di samping tempat tidur."},
         {level: 5, name: "Level 5: Transfer ke Kursi & Berjalan > 10 Langkah", description: "Mampu pindah ke kursi dan/atau berjalan lebih dari 10 langkah."},
-        {level: 6, name: "Level 6: Berjalan > 7 Meter", description: "Berjalan mandiri dengan atau tanpa alat bantu sejauh lebih dari 7 meter."},
-        {level: 7, name: "Level 7: Berjalan > 30 Meter", description: "Berjalan mandiri dengan atau tanpa alat bantu sejauh lebih dari 30 meter."},
-        {level: 8, name: "Level 8: Naik Turun Tangga", description: "Mampu naik/turun setidaknya satu anak tangga."}
+        {level: 6, name: "Level 6: Berjalan > 14 langkah", description: "Berjalan mandiri dengan atau tanpa alat bantu sejauh lebih dari 14 langkah."},
+        {level: 7, name: "Level 7: Berjalan > 60 langkah", description: "Berjalan mandiri dengan atau tanpa alat bantu sejauh lebih dari 60 langkah."},
+        {level: 8, name: "Level 8: Naik Turun Tangga atau Berjalan > 150 langkah", description: "Mampu naik/turun setidaknya satu anak tangga atau berjalan mandiri lebih dari 150 langkah."}
     ],
     questionnaire: {
         questions: [
@@ -248,7 +248,7 @@ async function saveNewPatient() {
         painScale: 0,
         ponv: document.getElementById('initial-ponv').value,
         rass: document.getElementById('initial-rass').value,
-        notes: 'Data awal pasien.',
+        notes: document.getElementById('initial-notes').value || 'Data awal pasien.',
         nurse: selectedNurse
     };
     
@@ -518,7 +518,7 @@ async function renderPatientTable(patients) {
                 <td>${p.operation}</td>
                 <td>${p.anesthesia}</td>
                 <td class="post-op-time" data-timestamp="${finishTimestamp}">${formatPostOpDuration(finishTimestamp)}</td>
-                <td>${latestObs.ponv} / ${latestObs.rass}</td>
+                <td><small><strong>PONV:</strong> ${latestObs.ponv}<br><strong>RASS:</strong> ${latestObs.rass}</small></td>
                 <td><span class="status status-level-${latestObs.mobilityLevel}">Level ${latestObs.mobilityLevel}</span></td>
                 <td class="target-cell"><div class="loading-state"><i class="fas fa-spinner fa-spin"></i> AI...</div></td>
                 <td class="suggestion-cell">
@@ -556,12 +556,12 @@ async function renderPatientTable(patients) {
 
 
 async function getAIPlan(patient) {
-    const latestObs = patient.latestObservation || { mobilityLevel: 1, ponv: 'Tidak Ada', rass: 'Sadar & Tenang', painScale: 0 };
+    const latestObs = patient.latestObservation || { mobilityLevel: 1, ponv: 'Tidak ada keluhan', rass: '0: Sadar & Tenang', painScale: 0, notes: '' };
     const hoursPostOp = (Date.now() - (getSecondsFromTS(patient.surgeryFinishTime) * 1000)) / (3600 * 1000);
 
     const systemPrompt = `Anda adalah seorang perawat klinis ahli pemulihan pasca-operasi di sebuah rumah sakit di Indonesia. Tugas Anda adalah memberikan rekomendasi mobilisasi dini yang aman dan efektif. Berikan jawaban HANYA dalam format JSON.
     Format JSON harus berisi tiga kunci: "targetLevel" (angka integer antara 1-8), "targetText" (string, contoh: "Level 4"), dan "suggestion" (string dalam Bahasa Indonesia, singkat, jelas, dan berorientasi pada tindakan untuk perawat).
-    Analisis data pasien berikut dan tentukan target serta saran yang paling sesuai. Pertimbangkan semua faktor secara holistik (umur, jenis kelamin, jenis operasi, anestesi, lama post-op, ponv, rass, dll).
+    Analisis data pasien berikut dan tentukan target serta saran yang paling sesuai. Pertimbangkan semua faktor secara holistik (umur, jenis kelamin, jenis operasi, anestesi, lama post-op, ponv, rass, catatan tambahan, dll).
     - Prioritaskan keamanan: Jika ada PONV, RASS yang tidak stabil, atau efek anestesi spinal, target harus konservatif.
     - Bersikap progresif: Jika pasien stabil, dorong ke level berikutnya.
     - Berikan saran yang spesifik dan dapat ditindaklanuti.`;
@@ -577,6 +577,7 @@ async function getAIPlan(patient) {
     - Kondisi PONV (Mual/Muntah): ${latestObs.ponv}
     - Tingkat Kesadaran (RASS): ${latestObs.rass}
     - Skala Nyeri (0-10): ${latestObs.painScale}
+    - Catatan Tambahan: ${latestObs.notes || 'Tidak ada'}
 
     Berdasarkan data di atas, berikan rekomendasi mobilisasi dalam format JSON yang diminta.`;
 
@@ -621,14 +622,14 @@ async function getAIPlan(patient) {
 }
 
 function getRuleBasedPlan(patient) {
-    const latestObs = patient.latestObservation || { mobilityLevel: 1, ponv: 'Tidak Ada', rass: 'Sadar & Tenang', painScale: 0 };
+    const latestObs = patient.latestObservation || { mobilityLevel: 1, ponv: 'Tidak ada keluhan', rass: '0: Sadar & Tenang', painScale: 0 };
     const hoursPostOp = (Date.now() - (getSecondsFromTS(patient.surgeryFinishTime) * 1000)) / (3600 * 1000);
     const currentLevel = latestObs.mobilityLevel;
 
     let targetLevel = (hoursPostOp < 24) ? 3 : (hoursPostOp < 48 ? 4 : 5);
     let suggestions = [];
 
-    if (latestObs.ponv !== 'Tidak Ada' || latestObs.rass !== 'Sadar & Tenang') {
+    if (latestObs.ponv !== 'Tidak ada keluhan' || !latestObs.rass.startsWith('0:')) {
         targetLevel = Math.min(targetLevel, currentLevel, 2);
         suggestions.push("<strong>Prioritas:</strong> Atasi PONV/RASS sebelum melanjutkan mobilisasi.");
     }
@@ -660,6 +661,19 @@ function openPatientModal(patientId = null) {
     document.getElementById('modal-title').textContent = isEditing ? 'Update Observasi Pasien' : 'Tambah Pasien Baru';
     const modalBody = document.getElementById('modal-body');
     
+    const ponvOptions = [
+        "Tidak ada keluhan", "Mual tanpa muntah", "Muntah 1-2 kali", "Muntah >2 kali"
+    ].map(opt => `<option value="${opt}">${opt}</option>`).join('');
+
+    const rassOptions = [
+        { value: "+1: Gelisah", text: "+1: Gelisah (Restless)"},
+        { value: "0: Sadar & Tenang", text: "0: Sadar & Tenang (Alert and Calm)"},
+        { value: "-1: Mengantuk", text: "-1: Mengantuk (Drowsy)"},
+        { value: "-2: Sedasi Ringan", text: "-2: Sedasi Ringan (Respon suara)"},
+        { value: "-3: Sedasi Dalam", text: "-3: Sedasi Dalam (Respon sentuhan)"},
+        { value: "-4: Tidak Merespon", text: "-4: Tidak Merespon (Unarousable)"}
+    ].map(opt => `<option value="${opt.value}">${opt.text}</option>`).join('');
+
     const addForm = `
         <div class="modal-grid">
             <div class="form-group"><label for="patient-name">Nama Pasien</label><input type="text" id="patient-name" class="form-control" required></div>
@@ -677,9 +691,13 @@ function openPatientModal(patientId = null) {
         <hr class="form-divider">
         <h4>Observasi Awal</h4>
         <div class="modal-grid">
-            <div class="form-group"><label>Mual/Muntah (PONV)</label><select id="initial-ponv" class="form-control"><option>Tidak Ada</option><option>Ringan</option><option>Berat</option></select></div>
-            <div class="form-group"><label>Tingkat Kesadaran (RASS)</label><select id="initial-rass" class="form-control"><option>Sadar & Tenang</option><option>Mengantuk</option><option>Respon suara</option><option>Tak ada respon</option></select></div>
+            <div class="form-group"><label>Mual/Muntah (PONV)</label><select id="initial-ponv" class="form-control">${ponvOptions}</select></div>
+            <div class="form-group"><label>Tingkat Kesadaran (RASS)</label><select id="initial-rass" class="form-control">${rassOptions}</select></div>
             <div class="form-group full-width"><label>Mobilisasi Awal (JH-HLM)</label><select id="initial-mobility" class="form-control">${appData.mobilityScale.map(s=>`<option value="${s.level}">${s.name}</option>`).join('')}</select></div>
+            <div class="form-group full-width">
+                <label for="initial-notes">Catatan Tambahan</label>
+                <textarea id="initial-notes" class="form-control" rows="2" placeholder="Contoh: Riwayat hipertensi, terpasang kateter, dll..."></textarea>
+            </div>
         </div>
         <div class="modal-footer"><button class="btn btn--primary" id="save-new-patient-btn">Simpan Pasien</button></div>`;
         
@@ -690,8 +708,8 @@ function openPatientModal(patientId = null) {
         <div class="modal-grid">
             <div class="form-group full-width"><label>Update Skala Mobilitas (JH-HLM)</label><select id="update-mobility" class="form-control">${appData.mobilityScale.map(s=>`<option value="${s.level}">${s.name}</option>`).join('')}</select></div>
             <div class="form-group"><label>Skala Nyeri (0-10)</label><input type="number" id="update-pain" class="form-control" min="0" max="10" value="0"></div>
-            <div class="form-group"><label>Mual/Muntah (PONV)</label><select id="update-ponv" class="form-control"><option>Tidak Ada</option><option>Ringan</option><option>Berat</option></select></div>
-            <div class="form-group"><label>Tingkat Kesadaran (RASS)</label><select id="update-rass" class="form-control"><option>Sadar & Tenang</option><option>Mengantuk</option><option>Respon suara</option><option>Tak ada respon</option></select></div>
+            <div class="form-group"><label>Mual/Muntah (PONV)</label><select id="update-ponv" class="form-control">${ponvOptions}</select></div>
+            <div class="form-group"><label>Tingkat Kesadaran (RASS)</label><select id="update-rass" class="form-control">${rassOptions}</select></div>
             <div class="form-group full-width"><label>Catatan Tambahan</label><textarea id="update-notes" class="form-control" rows="2"></textarea></div>
         </div>
         <div class="modal-footer"><button class="btn btn--primary" id="save-update-btn" data-id="${patientId}">Simpan Observasi</button></div>`;
@@ -702,8 +720,9 @@ function openPatientModal(patientId = null) {
         const latestObs = patient.latestObservation || {};
         document.getElementById('update-mobility').value = latestObs.mobilityLevel || 1;
         document.getElementById('update-pain').value = latestObs.painScale || 0;
-        document.getElementById('update-ponv').value = latestObs.ponv || 'Tidak Ada';
-        document.getElementById('update-rass').value = latestObs.rass || 'Sadar & Tenang';
+        document.getElementById('update-ponv').value = latestObs.ponv || 'Tidak ada keluhan';
+        document.getElementById('update-rass').value = latestObs.rass || '0: Sadar & Tenang';
+        document.getElementById('update-notes').value = latestObs.notes || '';
         document.getElementById('save-update-btn').addEventListener('click', savePatientUpdate);
     } else {
         const now = new Date();
@@ -914,7 +933,7 @@ function renderPatientDashboardAnalysis(data) {
     };
     patients.forEach(p => {
         const obs = p.latestObservation;
-        const hasBarrier = obs.ponv !== 'Tidak Ada' || obs.rass !== 'Sadar & Tenang';
+        const hasBarrier = obs.ponv !== 'Tidak ada keluhan' || !obs.rass.startsWith('0:');
         const targetPlan = getRuleBasedPlan(p);
         const isAchieved = obs.mobilityLevel >= targetPlan.targetLevel;
 
@@ -1029,4 +1048,3 @@ function showConfirmationDialog(message, onConfirm) {
     };
     document.getElementById('confirm-cancel').onclick = closeDialog;
 }
-

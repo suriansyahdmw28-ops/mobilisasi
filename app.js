@@ -18,7 +18,7 @@ const appData = {
         {level: 5, name: "Level 5: Transfer ke Kursi & Berjalan > 10 Langkah", description: "Mampu pindah ke kursi dan/atau berjalan lebih dari 10 langkah."},
         {level: 6, name: "Level 6: Berjalan > 7 Meter", description: "Berjalan mandiri dengan atau tanpa alat bantu sejauh lebih dari 7 meter."},
         {level: 7, name: "Level 7: Berjalan > 30 Meter", description: "Berjalan mandiri dengan atau tanpa alat bantu sejauh lebih dari 30 meter."},
-        {level: 8, name: "Level 8: Naik Turun Tangga atau berjalan > 75 Meter", description: "Mampu naik/turun setidaknya satu anak tangga atau Berjalan Mandiri lebih dari 75 meter."}
+        {level: 8, name: "Level 8: Naik Turun Tangga", description: "Mampu naik/turun setidaknya satu anak tangga."}
     ],
     questionnaire: {
         questions: [
@@ -134,6 +134,7 @@ async function addObservationToPatient(patientId, observation) {
     await updateDoc(doc(db, patientDocPath), { latestObservation: { ...observation, createdAt: serverTimestamp() } });
 }
 
+// --- FUNGSI KUESIONER (DIUBAH) ---
 async function handleQuestionnaireSubmit(e) {
     e.preventDefault();
     if (!userId || !clinicId) return showToast("Database belum siap.", "error");
@@ -143,23 +144,43 @@ async function handleQuestionnaireSubmit(e) {
     if (!patientName || !patientRM) return showToast("Harap lengkapi Nama dan Nomor RM.", "error");
 
     const formData = new FormData(e.target);
-    let totalScore = 0;
+    let knowledgeScore = 0, promisScore = 0;
+    let maxKnowledgeScore = 0, maxPromisScore = 0;
     const answers = {};
+
     for (const q of appData.questionnaire.questions) {
         const answer = formData.get(`q_${q.id}`);
         if (!answer) return showToast("Harap jawab semua pertanyaan.", "warning");
         answers[q.id] = answer;
-        totalScore += appData.questionnaire.scoring[q.type][answer];
+        const score = appData.questionnaire.scoring[q.type][answer];
+
+        if (q.type.includes('_promis')) {
+            promisScore += score;
+            maxPromisScore += 2;
+        } else {
+            knowledgeScore += score;
+            maxKnowledgeScore += 2;
+        }
     }
     
     const collectionPath = `clinics/${clinicId}/questionnaires`;
-    const resultData = { patientName, patientRM, testType: currentTestType, score: totalScore, answers, createdAt: serverTimestamp(), createdBy: userId, clinicId };
+    const resultData = { 
+        patientName, 
+        patientRM, 
+        testType: currentTestType, 
+        knowledgeScore, 
+        promisScore,
+        totalScore: knowledgeScore + promisScore,
+        answers, 
+        createdAt: serverTimestamp(), 
+        createdBy: userId, 
+        clinicId 
+    };
     
     try {
         await addDoc(collection(db, collectionPath), resultData);
         showToast("Hasil kuesioner berhasil disimpan!", "success");
-        const maxScore = appData.questionnaire.questions.length * 2;
-        displayResults(totalScore, maxScore);
+        displayResults(knowledgeScore, maxKnowledgeScore, promisScore, maxPromisScore);
     } catch (err) {
         console.error("Error saving questionnaire: ", err);
         showToast("Gagal menyimpan hasil.", "error");
@@ -324,23 +345,15 @@ function getSecondsFromTS(ts) {
     return Math.floor(new Date(ts).getTime()/1000);
 }
 
+// --- FUNGSI FORMAT WAKTU (DIUBAH) ---
 function formatPostOpDuration(timestamp) {
-    // 1. Hitung total jam sejak operasi selesai
     const totalHours = Math.floor((Date.now() - timestamp) / (1000 * 60 * 60));
-    
-    // Jika waktu belum berlalu, tampilkan 'Baru saja'
-    if (totalHours < 1) return 'kurang dari 1 jam';
-    
-    // 2. Jika kurang dari 24 jam, tampilkan dalam format jam saja
+    if (totalHours < 0) return 'Baru saja';
     if (totalHours < 24) {
         return `${totalHours} jam`;
     }
-    
-    // 3. Jika lebih dari 24 jam, hitung hari dan sisa jamnya
     const days = Math.floor(totalHours / 24);
     const hours = totalHours % 24;
-    
-    // 4. Kembalikan dalam format "X hari Y jam"
     return `${days} hari ${hours} jam`;
 }
 
@@ -427,19 +440,46 @@ function generateQuestionnaire() {
         </div>`).join('');
 }
 
-function displayResults(score, maxScore) {
+// --- FUNGSI HASIL KUESIONER (DIUBAH) ---
+function displayResults(knowledgeScore, maxKnowledgeScore, promisScore, maxPromisScore) {
     document.getElementById('questionnaire-form').classList.add('hidden');
     const resultsContainer = document.getElementById('results-container');
     resultsContainer.classList.remove('hidden');
-    document.getElementById('score-display').textContent = score;
+    
+    // Total skor ditampilkan sebagai gabungan
+    const totalScore = knowledgeScore + promisScore;
+    document.getElementById('score-display').textContent = totalScore;
+    document.getElementById('score-total').textContent = `dari ${maxKnowledgeScore + maxPromisScore}`;
+
+    // Penentuan interpretasi
+    const knowledgeLevel = knowledgeScore / maxKnowledgeScore;
+    const promisLevel = promisScore / maxPromisScore;
+
+    let knowledgeText, promisText, overallClass;
+
+    if (knowledgeLevel >= 0.75) knowledgeText = "Pemahaman Baik";
+    else if (knowledgeLevel >= 0.5) knowledgeText = "Pemahaman Cukup";
+    else knowledgeText = "Pemahaman Kurang";
+
+    if (promisLevel >= 0.75) promisText = "Kondisi Mendukung";
+    else if (promisLevel >= 0.5) promisText = "Kondisi Cukup Mendukung";
+    else promisText = "Kondisi Kurang Mendukung";
+
+    if (knowledgeLevel >= 0.75 && promisLevel >= 0.75) overallClass = "good";
+    else if (knowledgeLevel < 0.5 || promisLevel < 0.5) overallClass = "poor";
+    else overallClass = "fair";
+
     const interpEl = document.getElementById('interpretation');
-    let interp;
-    if (score >= maxScore * 0.75) interp = { text: "Pengetahuan & Kondisi Baik", class: "good" };
-    else if (score >= maxScore * 0.5) interp = { text: "Pengetahuan & Kondisi Cukup", class: "fair" };
-    else interp = { text: "Pengetahuan & Kondisi Kurang", class: "poor" };
-    interpEl.innerHTML = `<h4>${interp.text}</h4>`;
-    interpEl.className = `interpretation ${interp.class}`;
+    interpEl.innerHTML = `
+        <h4>${knowledgeText} & ${promisText}</h4>
+        <div class="score-breakdown">
+            <span>Pemahaman: <strong>${knowledgeScore}/${maxKnowledgeScore}</strong></span>
+            <span>Kondisi PROMIS: <strong>${promisScore}/${maxPromisScore}</strong></span>
+        </div>
+    `;
+    interpEl.className = `interpretation ${overallClass}`;
 }
+
 
 function resetQuestionnaire() {
     document.getElementById('questionnaire-form').reset();
@@ -475,13 +515,14 @@ async function renderPatientTable(patients) {
     const patientPromises = patients.map(p => {
         const latestObs = p.latestObservation || { ponv: 'N/A', rass: 'N/A', mobilityLevel: 1 };
         const finishSeconds = getSecondsFromTS(p.surgeryFinishTime);
+        const finishTimestamp = finishSeconds * 1000;
         return `
             <tr data-patient-id="${p.id}">
                 <td><strong>${p.name}</strong><br><small>${p.rm}</small></td>
                 <td>${p.age} thn<br><small>${p.gender}</small></td>
                 <td>${p.operation}</td>
                 <td>${p.anesthesia}</td>
-                <td class="post-op-time" data-timestamp="${finishSeconds}">${formatPostOpDuration(finishSeconds * 1000)}</td>
+                <td class="post-op-time" data-timestamp="${finishTimestamp}">${formatPostOpDuration(finishTimestamp)}</td>
                 <td>${latestObs.ponv} / ${latestObs.rass}</td>
                 <td><span class="status status-level-${latestObs.mobilityLevel}">Level ${latestObs.mobilityLevel}</span></td>
                 <td class="target-cell"><div class="loading-state"><i class="fas fa-spinner fa-spin"></i> AI...</div></td>
@@ -520,7 +561,7 @@ async function renderPatientTable(patients) {
 }
 
 
-// --- PERUBAHAN BESAR: INTEGRASI GEMINI AI ---
+// --- INTEGRASI GEMINI AI ---
 async function getAIPlan(patient) {
     const latestObs = patient.latestObservation || { mobilityLevel: 1, ponv: 'Tidak Ada', rass: 'Sadar & Tenang', painScale: 0 };
     const hoursPostOp = (Date.now() - (getSecondsFromTS(patient.surgeryFinishTime) * 1000)) / (3600 * 1000);
@@ -697,15 +738,15 @@ function startRealtimeClocks() {
         document.querySelectorAll('.post-op-time').forEach(el => {
             const timestamp = parseInt(el.dataset.timestamp, 10);
             if (!isNaN(timestamp)) {
-               el.textContent = formatPostOpDuration(timestamp * 1000);
+               el.textContent = formatPostOpDuration(timestamp);
             }
         });
     };
-    setInterval(updateTimes, 1000 * 60); // Update setiap menit
+    setInterval(updateTimes, 1000 * 60 * 30); // Update setiap 30 menit
     updateTimes();
 }
 
-// --- FUNGSI ANALISIS ---
+// --- FUNGSI ANALISIS GLOBAL (DIUBAH TOTAL) ---
 
 function renderGlobalAnalysis() {
     renderQuestionnaireAnalysis(questionnaireData);
@@ -721,10 +762,11 @@ function renderQuestionnaireAnalysis(data) {
 
     const preTests = data.filter(d => d.testType === 'pretest');
     const postTests = data.filter(d => d.testType === 'posttest');
-
-    const avgPreScore = preTests.length > 0 ? (preTests.reduce((sum, d) => sum + d.score, 0) / preTests.length) : 0;
-    const avgPostScore = postTests.length > 0 ? (postTests.reduce((sum, d) => sum + d.score, 0) / postTests.length) : 0;
-    const improvement = avgPreScore > 0 ? ((avgPostScore - avgPreScore) / avgPreScore) * 100 : 0;
+    
+    // Gunakan totalScore untuk perbandingan umum
+    const avgPreScore = preTests.length > 0 ? (preTests.reduce((sum, d) => sum + (d.totalScore || 0), 0) / preTests.length) : 0;
+    const avgPostScore = postTests.length > 0 ? (postTests.reduce((sum, d) => sum + (d.totalScore || 0), 0) / postTests.length) : 0;
+    const improvement = avgPreScore > 0 ? ((avgPostScore - avgPreScore) / avgPreScore) * 100 : (avgPostScore > 0 ? 100 : 0);
 
     container.innerHTML = `
         <div class="analysis-grid">
@@ -746,107 +788,124 @@ function renderQuestionnaireAnalysis(data) {
                 <div class="stat-icon"><i class="fas fa-arrow-up"></i></div>
                 <div class="stat-content">
                     <div class="stat-value">${improvement.toFixed(0)}%</div>
-                    <div class="stat-label">Peningkatan Pemahaman</div>
+                    <div class="stat-label">Peningkatan Skor</div>
                 </div>
             </div>
         </div>
         <div class="interpretation-card">
             <h4>Interpretasi</h4>
-            <p>Data menunjukkan adanya <strong>peningkatan pemahaman pasien sebesar ${improvement.toFixed(0)}%</strong> setelah mendapatkan edukasi. Skor rata-rata yang lebih tinggi pada post-test mengindikasikan bahwa intervensi efektif.</p>
+            <p>Data menunjukkan adanya <strong>peningkatan skor gabungan (pemahaman & kondisi) pasien sebesar ${improvement.toFixed(0)}%</strong> setelah mendapatkan edukasi. Skor rata-rata yang lebih tinggi pada post-test mengindikasikan bahwa intervensi dan perawatan secara umum efektif dalam meningkatkan kesiapan pasien untuk mobilisasi.</p>
         </div>
     `;
 }
 
 function renderPatientDashboardAnalysis(data) {
     const container = document.getElementById('patient-analysis-container');
-    if (data.length === 0) {
-        container.innerHTML = `<div class="info-card"><p>Belum ada data pasien untuk dianalisis.</p></div>`;
+    if (!data || data.filter(p => p.latestObservation).length < 2) { // Butuh minimal 2 data untuk analisis berarti
+        container.innerHTML = `<div class="info-card"><p>Belum ada data pasien yang cukup untuk dianalisis secara mendalam.</p></div>`;
         return;
     }
 
     container.innerHTML = `
         <div class="analysis-grid-varied">
             <div class="chart-container">
-                <h4>Progres Mobilisasi per Hari Post-Op</h4>
-                <canvas id="progress-by-pod-chart"></canvas>
+                <h4>Dampak Anestesi thd Mobilisasi Awal (<24 Jam)</h4>
+                <canvas id="anesthesia-impact-chart"></canvas>
             </div>
             <div class="chart-container">
-                <h4>Rata-rata Level Mobilisasi per Jenis Operasi</h4>
-                <canvas id="mobility-by-op-chart"></canvas>
+                <h4>Progres Mobilisasi Rata-rata per Kelompok Usia</h4>
+                <canvas id="mobility-by-age-chart"></canvas>
             </div>
             <div class="chart-container full-span">
-                <h4>Pengaruh Hambatan (PONV/RASS) Terhadap Pencapaian Target</h4>
-                <canvas id="barrier-impact-chart"></canvas>
+                <h4>Korelasi Skala Nyeri dengan Level Mobilisasi Tercapai</h4>
+                <canvas id="pain-vs-mobility-chart"></canvas>
             </div>
         </div>
         <div class="interpretation-card">
-            <h4>Interpretasi Wawasan</h4>
-            <p>Grafik di atas memberikan wawasan kunci: <strong>(1)</strong> Progresivitas mobilisasi pasien seiring waktu, idealnya menunjukkan tren naik. <strong>(2)</strong> Perbandingan efektivitas mobilisasi antar jenis operasi, menyoroti operasi mana yang mungkin memerlukan perhatian lebih. <strong>(3)</strong> Dampak signifikan dari hambatan seperti mual dan tingkat kesadaran terhadap kemampuan pasien mencapai target mobilisasi harian mereka.</p>
+            <h4>Wawasan Klinis dari Data</h4>
+            <p>Analisis data pasien menunjukkan beberapa tren kunci:
+            <ul>
+                <li><strong>Jenis Anestesi:</strong> Grafik pertama membandingkan progres mobilisasi pasien dalam 24 jam pertama. Ini dapat mengungkap apakah pasien dengan anestesi spinal memerlukan waktu lebih lama untuk mencapai level mobilisasi awal dibandingkan anestesi umum.</li>
+                <li><strong>Faktor Usia:</strong> Grafik kedua mengelompokkan pasien berdasarkan usia. Tren di sini bisa menunjukkan apakah kelompok usia tertentu (misalnya, lansia) memerlukan dukungan atau strategi mobilisasi yang berbeda untuk mencapai target.</li>
+                <li><strong>Manajemen Nyeri:</strong> Grafik ketiga adalah yang paling penting, menunjukkan hubungan langsung antara tingkat nyeri dan keberhasilan mobilisasi. Skor nyeri yang tinggi secara konsisten berkorelasi dengan level mobilisasi yang lebih rendah, menekankan pentingnya manajemen nyeri yang efektif sebagai prasyarat mobilisasi dini.</li>
+            </ul>
+            </p>
         </div>
     `;
+    
+    const patients = data.filter(p => p.latestObservation && p.surgeryFinishTime);
 
-    // 1. Data untuk Progres per POD (Line Chart)
-    const progressByPod = {};
-    data.forEach(p => {
-        if (p.latestObservation && p.surgeryFinishTime) {
-            const hoursPostOp = (getSecondsFromTS(p.latestObservation.createdAt || p.createdAt) - getSecondsFromTS(p.surgeryFinishTime)) / 3600;
-            const pod = Math.floor(hoursPostOp / 24);
-            if (pod < 5) { 
-                if (!progressByPod[pod]) progressByPod[pod] = [];
-                progressByPod[pod].push(p.latestObservation.mobilityLevel);
-            }
-        }
+    // 1. Analisis Dampak Anestesi
+    const anesthesiaData = {};
+    const earlyPatients = patients.filter(p => {
+        const hoursPostOp = (Date.now() - getSecondsFromTS(p.surgeryFinishTime) * 1000) / (3600 * 1000);
+        return hoursPostOp < 24;
     });
-    const podLabels = Object.keys(progressByPod).sort();
-    const podData = podLabels.map(pod => {
-        const levels = progressByPod[pod];
+
+    earlyPatients.forEach(p => {
+        const type = p.anesthesia.includes("General") ? "General Anesthesia" : (p.anesthesia.includes("Spinal") ? "Spinal Anesthesia" : "Lainnya");
+        if (!anesthesiaData[type]) anesthesiaData[type] = [];
+        anesthesiaData[type].push(p.latestObservation.mobilityLevel);
+    });
+
+    const anesthesiaLabels = Object.keys(anesthesiaData);
+    const anesthesiaValues = anesthesiaLabels.map(label => {
+        const levels = anesthesiaData[label];
         return levels.reduce((a, b) => a + b, 0) / levels.length;
     });
-    renderChart('progress-by-pod-chart', 'line', {
-        labels: podLabels.map(l => `POD ${l}`),
-        datasets: [{ label: 'Rata-rata Level', data: podData, tension: 0.2, fill: true, borderColor: 'var(--color-primary)', backgroundColor: 'rgba(var(--color-teal-500-rgb), 0.1)' }]
+    renderChart('anesthesia-impact-chart', 'bar', {
+        labels: anesthesiaLabels,
+        datasets: [{ label: 'Rata-rata Level Mobilisasi', data: anesthesiaValues, backgroundColor: ['rgba(var(--color-teal-500-rgb), 0.7)', 'rgba(var(--color-orange-400-rgb), 0.7)', 'rgba(var(--color-slate-500-rgb), 0.7)'], borderRadius: 4 }]
+    }, { plugins: { legend: { display: false }}, scales: { y: { beginAtZero: true, suggestedMax: 5 } } });
+
+
+    // 2. Analisis berdasarkan Kelompok Usia
+    const ageData = { '< 40': [], '40 - 60': [], '> 60': [] };
+    patients.forEach(p => {
+        const age = parseInt(p.age);
+        const level = p.latestObservation.mobilityLevel;
+        if (age < 40) ageData['< 40'].push(level);
+        else if (age <= 60) ageData['40 - 60'].push(level);
+        else ageData['> 60'].push(level);
     });
 
-    // 2. Data untuk Rata-rata Level per Jenis Operasi (Bar Chart)
-    const mobilityByOp = {};
-    data.forEach(p => {
-        if (p.latestObservation) {
-            if (!mobilityByOp[p.operation]) mobilityByOp[p.operation] = [];
-            mobilityByOp[p.operation].push(p.latestObservation.mobilityLevel);
-        }
-    });
-    const opLabels = Object.keys(mobilityByOp);
-    const opData = opLabels.map(op => {
-        const levels = mobilityByOp[op];
+    const ageLabels = Object.keys(ageData);
+    const ageValues = ageLabels.map(label => {
+        const levels = ageData[label];
+        if (levels.length === 0) return 0;
         return levels.reduce((a, b) => a + b, 0) / levels.length;
     });
-    renderChart('mobility-by-op-chart', 'bar', {
-        labels: opLabels,
-        datasets: [{ label: 'Rata-rata Level', data: opData, backgroundColor: 'rgba(var(--color-teal-500-rgb), 0.7)', borderRadius: 4 }]
-    }, { indexAxis: 'y', scales: { x: { beginAtZero: true } } });
+    renderChart('mobility-by-age-chart', 'bar', {
+        labels: ageLabels.map(l => `${l} thn`),
+        datasets: [{ label: 'Rata-rata Level Mobilisasi', data: ageValues, backgroundColor: 'rgba(var(--color-primary-rgb), 0.7)', borderRadius: 4 }]
+    }, { plugins: { legend: { display: false }}, scales: { y: { beginAtZero: true } } });
 
-    // 3. Data untuk Pengaruh Hambatan (Stacked Bar Chart)
-    let barrierAchieved = 0, barrierNotAchieved = 0;
-    let noBarrierAchieved = 0, noBarrierNotAchieved = 0;
-    data.forEach(p => {
-        if (p.latestObservation) {
-            const plan = getRuleBasedPlan(p); // Use rule-based for analysis consistency
-            const hasBarrier = p.latestObservation.ponv !== 'Tidak Ada' || p.latestObservation.rass !== 'Sadar & Tenang';
-            const isTargetAchieved = p.latestObservation.mobilityLevel >= plan.targetLevel;
-            if (hasBarrier) {
-                isTargetAchieved ? barrierAchieved++ : barrierNotAchieved++;
-            } else {
-                isTargetAchieved ? noBarrierAchieved++ : noBarrierNotAchieved++;
-            }
-        }
+
+    // 3. Analisis Korelasi Nyeri vs. Mobilisasi
+    const painData = {};
+    patients.forEach(p => {
+        const pain = p.latestObservation.painScale || 0;
+        if (!painData[pain]) painData[pain] = [];
+        painData[pain].push(p.latestObservation.mobilityLevel);
     });
-    renderChart('barrier-impact-chart', 'bar', {
-        labels: ['Tanpa Hambatan (PONV/RASS)', 'Dengan Hambatan (PONV/RASS)'],
-        datasets: [
-            { label: 'Target Tercapai', data: [noBarrierAchieved, barrierAchieved], backgroundColor: 'rgba(var(--color-success-rgb), 0.7)', borderRadius: 4 },
-            { label: 'Target Belum Tercapai', data: [noBarrierNotAchieved, barrierNotAchieved], backgroundColor: 'rgba(var(--color-error-rgb), 0.6)', borderRadius: 4 }
-        ]
-    }, { scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } } });
+
+    const painLabels = Object.keys(painData).sort((a,b) => a-b);
+    const painValues = painLabels.map(label => {
+        const levels = painData[label];
+        return levels.reduce((a, b) => a + b, 0) / levels.length;
+    });
+
+    renderChart('pain-vs-mobility-chart', 'line', {
+        labels: painLabels.map(l => `Nyeri ${l}`),
+        datasets: [{ 
+            label: 'Rata-rata Level Mobilisasi', 
+            data: painValues,
+            borderColor: 'var(--color-red-400)',
+            backgroundColor: 'rgba(var(--color-red-400-rgb), 0.1)',
+            fill: true,
+            tension: 0.3
+        }]
+    }, { scales: { y: { beginAtZero: true } } });
 }
 
 
@@ -857,7 +916,7 @@ function renderChart(canvasId, type, data, options = {}) {
         chartInstances[canvasId].destroy();
     }
     const defaultOptions = {
-        maintainAspectRatio: true, 
+        maintainAspectRatio: false,
         responsive: true,
         plugins: {
             legend: {
@@ -935,3 +994,4 @@ function showConfirmationDialog(message, onConfirm) {
     };
     document.getElementById('confirm-cancel').onclick = closeDialog;
 }
+

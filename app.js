@@ -556,13 +556,13 @@ async function renderPatientTable(patients) {
 
 
 async function getAIPlan(patient) {
-    const latestObs = patient.latestObservation || { mobilityLevel: 1, ponv: 'Tidak ada keluhan', rass: '0: Sadar & Tenang', painScale: 0, notes: '' };
+    const latestObs = patient.latestObservation || { mobilityLevel: 1, ponv: 'Tidak ada keluhan', rass: '0: Alert & Calm', painScale: 0, notes: '' };
     const hoursPostOp = (Date.now() - (getSecondsFromTS(patient.surgeryFinishTime) * 1000)) / (3600 * 1000);
 
     const systemPrompt = `Anda adalah seorang perawat klinis ahli pemulihan pasca-operasi di sebuah rumah sakit di Indonesia. Tugas Anda adalah memberikan rekomendasi mobilisasi dini yang aman dan efektif. Berikan jawaban HANYA dalam format JSON.
     Format JSON harus berisi tiga kunci: "targetLevel" (angka integer antara 1-8), "targetText" (string, contoh: "Level 4"), dan "suggestion" (string dalam Bahasa Indonesia, singkat, jelas, dan berorientasi pada tindakan untuk perawat).
     Analisis data pasien berikut dan tentukan target serta saran yang paling sesuai. Pertimbangkan semua faktor secara holistik (umur, jenis kelamin, jenis operasi, anestesi, lama post-op, ponv, rass, catatan tambahan, dll).
-    - Prioritaskan keamanan: Jika ada PONV, RASS yang tidak stabil, atau efek anestesi spinal, target harus konservatif.
+    - Prioritaskan keamanan: Jika ada PONV, RASS yang tidak stabil (skor selain 0), atau efek anestesi spinal, target harus konservatif.
     - Bersikap progresif: Jika pasien stabil, dorong ke level berikutnya.
     - Berikan saran yang spesifik dan dapat ditindaklanuti.`;
 
@@ -622,7 +622,7 @@ async function getAIPlan(patient) {
 }
 
 function getRuleBasedPlan(patient) {
-    const latestObs = patient.latestObservation || { mobilityLevel: 1, ponv: 'Tidak ada keluhan', rass: '0: Sadar & Tenang', painScale: 0 };
+    const latestObs = patient.latestObservation || { mobilityLevel: 1, ponv: 'Tidak ada keluhan', rass: '0: Alert & Calm', painScale: 0 };
     const hoursPostOp = (Date.now() - (getSecondsFromTS(patient.surgeryFinishTime) * 1000)) / (3600 * 1000);
     const currentLevel = latestObs.mobilityLevel;
 
@@ -666,12 +666,16 @@ function openPatientModal(patientId = null) {
     ].map(opt => `<option value="${opt}">${opt}</option>`).join('');
 
     const rassOptions = [
-        { value: "+1: Gelisah", text: "+1: Gelisah (Restless)"},
-        { value: "0: Sadar & Tenang", text: "0: Sadar & Tenang (Alert and Calm)"},
-        { value: "-1: Mengantuk", text: "-1: Mengantuk (Drowsy)"},
-        { value: "-2: Sedasi Ringan", text: "-2: Sedasi Ringan (Respon suara)"},
-        { value: "-3: Sedasi Dalam", text: "-3: Sedasi Dalam (Respon sentuhan)"},
-        { value: "-4: Tidak Merespon", text: "-4: Tidak Merespon (Unarousable)"}
+        { value: "+4: Combative", text: "+4: Combative (Sangat melawan)" },
+        { value: "+3: Very Agitated", text: "+3: Very Agitated (Sangat gelisah, agresif)" },
+        { value: "+2: Agitated", text: "+2: Agitated (Gelisah, gerakan tanpa tujuan)" },
+        { value: "+1: Restless", text: "+1: Restless (Gelisah, tidak agresif)" },
+        { value: "0: Alert & Calm", text: "0: Alert & Calm (Terjaga dan tenang)" },
+        { value: "-1: Drowsy", text: "-1: Drowsy (Mengantuk, respon >10d)" },
+        { value: "-2: Light Sedation", text: "-2: Light Sedation (Sedasi ringan, respon <10d)" },
+        { value: "-3: Moderate Sedation", text: "-3: Moderate Sedation (Sedasi sedang, respon suara)" },
+        { value: "-4: Deep Sedation", text: "-4: Deep Sedation (Sedasi dalam, respon fisik)" },
+        { value: "-5: Unarusable", text: "-5: Unarusable (Tidak ada respon)" }
     ].map(opt => `<option value="${opt.value}">${opt.text}</option>`).join('');
 
     const addForm = `
@@ -721,7 +725,7 @@ function openPatientModal(patientId = null) {
         document.getElementById('update-mobility').value = latestObs.mobilityLevel || 1;
         document.getElementById('update-pain').value = latestObs.painScale || 0;
         document.getElementById('update-ponv').value = latestObs.ponv || 'Tidak ada keluhan';
-        document.getElementById('update-rass').value = latestObs.rass || '0: Sadar & Tenang';
+        document.getElementById('update-rass').value = latestObs.rass || '0: Alert & Calm';
         document.getElementById('update-notes').value = latestObs.notes || '';
         document.getElementById('save-update-btn').addEventListener('click', savePatientUpdate);
     } else {
@@ -1048,3 +1052,4 @@ function showConfirmationDialog(message, onConfirm) {
     };
     document.getElementById('confirm-cancel').onclick = closeDialog;
 }
+

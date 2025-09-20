@@ -25,7 +25,7 @@ const appData = {
             { id: 1, text: "Apakah menggerakkan badan sesegera mungkin setelah operasi akan mempercepat pemulihan?", type: "positive" },
             { id: 2, text: "Apakah bergerak setelah operasi sangat berbahaya karena bisa membuat jahitan lepas?", type: "negative" },
             { id: 3, text: "Apakah latihan gerak di tempat tidur merupakan langkah pertama yang penting?", type: "positive" },
-            { id: 4, text: "Apakah jika terasa sangat nyeri saat bergerak, sebaiknya Anda berhenti dan memanggil perawat?", type: "positive" },
+            { id: 4, text: "Apakah sebaiknya Anda berhenti dan memanggil perawat, jika terasa sangat nyeri saat bergerak?", type: "positive" },
             { id: 5, text: "Apakah dalam 24 jam terakhir, rasa nyeri membuat Anda sulit untuk bergerak?", type: "negative" },
             { id: 6, text: "Apakah dalam 24 jam terakhir, rasa nyeri mengganggu aktivitas Anda di tempat tidur (seperti miring kanan-kiri)?", type: "negative" },
             { id: 7, text: "Apakah Anda merasa cukup kuat untuk duduk sendiri di tepi tempat tidur?", type: "positive" },

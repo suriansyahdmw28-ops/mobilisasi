@@ -22,22 +22,20 @@ const appData = {
     ],
     questionnaire: {
         questions: [
-            { id: 1, text: "Menggerakkan badan sesegera mungkin setelah operasi akan mempercepat pemulihan.", type: "positive" },
-            { id: 2, text: "Bergerak setelah operasi sangat berbahaya karena bisa membuat jahitan lepas.", type: "negative" },
-            { id: 3, text: "Latihan gerak di tempat tidur adalah langkah pertama yang penting.", type: "positive" },
-            { id: 4, text: "Jika terasa sangat nyeri saat bergerak, lebih baik berhenti dan panggil perawat.", type: "positive" },
-            { id: 5, text: "Dalam 24 jam terakhir, rasa nyeri membuat saya sulit untuk berkonsentrasi pada hal lain.", type: "negative_promis" },
-            { id: 6, text: "Dalam 24 jam terakhir, rasa nyeri mengganggu aktivitas saya di tempat tidur (misal: miring kanan-kiri).", type: "negative_promis" },
-            { id: 7, text: "Saya merasa cukup kuat untuk duduk sendiri di tepi tempat tidur.", type: "positive_promis" },
-            { id: 8, text: "Saya yakin bisa berjalan beberapa langkah tanpa bantuan.", type: "positive_promis" },
-            { id: 9, text: "Manfaat utama bergerak setelah operasi adalah agar bisa cepat pulang.", type: "positive" },
-            { id: 10, text: "Peran keluarga tidak penting, mobilisasi adalah tugas perawat sepenuhnya.", type: "negative" }
+            { id: 1, text: "Apakah menggerakkan badan sesegera mungkin setelah operasi akan mempercepat pemulihan?", type: "positive" },
+            { id: 2, text: "Apakah bergerak setelah operasi sangat berbahaya karena bisa membuat jahitan lepas?", type: "negative" },
+            { id: 3, text: "Apakah latihan gerak di tempat tidur merupakan langkah pertama yang penting?", type: "positive" },
+            { id: 4, text: "Apakah jika terasa sangat nyeri saat bergerak, sebaiknya Anda berhenti dan memanggil perawat?", type: "positive" },
+            { id: 5, text: "Apakah dalam 24 jam terakhir, rasa nyeri membuat Anda sulit untuk bergerak?", type: "negative" },
+            { id: 6, text: "Apakah dalam 24 jam terakhir, rasa nyeri mengganggu aktivitas Anda di tempat tidur (seperti miring kanan-kiri)?", type: "negative" },
+            { id: 7, text: "Apakah Anda merasa cukup kuat untuk duduk sendiri di tepi tempat tidur?", type: "positive" },
+            { id: 8, text: "Apakah Anda yakin bisa berjalan beberapa langkah tanpa bantuan?", type: "positive" },
+            { id: 9, text: "Apakah manfaat utama bergerak setelah operasi adalah agar bisa cepat pulang?", type: "positive" },
+            { id: 10, text: "Apakah peran keluarga tidak penting dan membantu anda bergerak adalah tugas perawat sepenuhnya?", type: "negative" }
         ],
         scoring: { 
-            positive: { setuju: 2, ragu: 1, tidak_setuju: 0 }, 
-            negative: { setuju: 0, ragu: 1, tidak_setuju: 2 },
-            negative_promis: { setuju: 0, ragu: 1, tidak_setuju: 2 },
-            positive_promis: { setuju: 2, ragu: 1, tidak_setuju: 0 }
+            positive: { ya: 1, tidak: 0 }, 
+            negative: { ya: 0, tidak: 1 }
         }
     }
 };
@@ -143,8 +141,8 @@ async function handleQuestionnaireSubmit(e) {
     if (!patientName || !patientRM) return showToast("Harap lengkapi Nama dan Nomor RM.", "error");
 
     const formData = new FormData(e.target);
-    let knowledgeScore = 0, promisScore = 0;
-    let maxKnowledgeScore = 0, maxPromisScore = 0;
+    let totalScore = 0;
+    const maxScore = appData.questionnaire.questions.length;
     const answers = {};
 
     for (const q of appData.questionnaire.questions) {
@@ -152,14 +150,7 @@ async function handleQuestionnaireSubmit(e) {
         if (!answer) return showToast("Harap jawab semua pertanyaan.", "warning");
         answers[q.id] = answer;
         const score = appData.questionnaire.scoring[q.type][answer];
-
-        if (q.type.includes('_promis')) {
-            promisScore += score;
-            maxPromisScore += 2;
-        } else {
-            knowledgeScore += score;
-            maxKnowledgeScore += 2;
-        }
+        totalScore += score;
     }
     
     const collectionPath = `clinics/${clinicId}/questionnaires`;
@@ -167,9 +158,7 @@ async function handleQuestionnaireSubmit(e) {
         patientName, 
         patientRM, 
         testType: currentTestType, 
-        knowledgeScore, 
-        promisScore,
-        totalScore: knowledgeScore + promisScore,
+        totalScore,
         answers, 
         createdAt: serverTimestamp(), 
         createdBy: userId, 
@@ -179,7 +168,7 @@ async function handleQuestionnaireSubmit(e) {
     try {
         await addDoc(collection(db, collectionPath), resultData);
         showToast("Hasil kuesioner berhasil disimpan!", "success");
-        displayResults(knowledgeScore, maxKnowledgeScore, promisScore, maxPromisScore);
+        displayResults(totalScore, maxScore);
     } catch (err) {
         console.error("Error saving questionnaire: ", err);
         showToast("Gagal menyimpan hasil.", "error");
@@ -431,50 +420,41 @@ function generateQuestionnaire() {
         <div class="question-item">
             <p>${i + 1}. ${q.text}</p>
             <div class="form-group-options">
-                <label class="option-label"><input type="radio" name="q_${q.id}" value="setuju" required> Setuju</label>
-                <label class="option-label"><input type="radio" name="q_${q.id}" value="ragu"> Ragu-ragu</label>
-                <label class="option-label"><input type="radio" name="q_${q.id}" value="tidak_setuju"> Tidak Setuju</label>
+                <label class="option-label"><input type="radio" name="q_${q.id}" value="ya" required> Ya</label>
+                <label class="option-label"><input type="radio" name="q_${q.id}" value="tidak" required> Tidak</label>
             </div>
         </div>`).join('');
 }
 
-function displayResults(knowledgeScore, maxKnowledgeScore, promisScore, maxPromisScore) {
+function displayResults(totalScore, maxScore) {
     document.getElementById('questionnaire-form').classList.add('hidden');
     const resultsContainer = document.getElementById('results-container');
     resultsContainer.classList.remove('hidden');
     
-    const totalScore = knowledgeScore + promisScore;
     document.getElementById('score-display').textContent = totalScore;
-    document.getElementById('score-total').textContent = `dari ${maxKnowledgeScore + maxPromisScore}`;
+    document.getElementById('score-total').textContent = `dari ${maxScore}`;
 
-    const knowledgeLevel = knowledgeScore / maxKnowledgeScore;
-    const promisLevel = promisScore / maxPromisScore;
+    const scorePercentage = totalScore / maxScore;
+    let interpretationText, overallClass;
 
-    let knowledgeText, promisText, overallClass;
-
-    if (knowledgeLevel >= 0.75) knowledgeText = "Pemahaman Baik";
-    else if (knowledgeLevel >= 0.5) knowledgeText = "Pemahaman Cukup";
-    else knowledgeText = "Pemahaman Kurang";
-
-    if (promisLevel >= 0.75) promisText = "Kondisi Mendukung";
-    else if (promisLevel >= 0.5) promisText = "Kondisi Cukup Mendukung";
-    else promisText = "Kondisi Kurang Mendukung";
-
-    if (knowledgeLevel >= 0.75 && promisLevel >= 0.75) overallClass = "good";
-    else if (knowledgeLevel < 0.5 || promisLevel < 0.5) overallClass = "poor";
-    else overallClass = "fair";
+    if (scorePercentage >= 0.8) {
+        interpretationText = "Pemahaman Sangat Baik";
+        overallClass = "good";
+    } else if (scorePercentage >= 0.5) {
+        interpretationText = "Pemahaman Cukup";
+        overallClass = "fair";
+    } else {
+        interpretationText = "Pemahaman Kurang";
+        overallClass = "poor";
+    }
 
     const interpEl = document.getElementById('interpretation');
     interpEl.innerHTML = `
-        <h4>${knowledgeText} & ${promisText}</h4>
-        <div class="score-breakdown">
-            <span>Pemahaman: <strong>${knowledgeScore}/${maxKnowledgeScore}</strong></span>
-            <span>Kondisi PROMIS: <strong>${promisScore}/${maxPromisScore}</strong></span>
-        </div>
+        <h4>${interpretationText}</h4>
+        <p>Pasien menjawab dengan benar <strong>${totalScore} dari ${maxScore}</strong> pertanyaan. Ini menunjukkan tingkat pemahaman pasien terhadap pentingnya dan cara melakukan mobilisasi dini.</p>
     `;
     interpEl.className = `interpretation ${overallClass}`;
 }
-
 
 function resetQuestionnaire() {
     document.getElementById('questionnaire-form').reset();
@@ -907,7 +887,7 @@ function renderQuestionnaireAnalysis(data) {
         </div>
         <div class="interpretation-card">
             <h4>Interpretasi</h4>
-            <p>Data menunjukkan adanya <strong>peningkatan skor gabungan (pemahaman & kondisi) pasien sebesar ${improvement.toFixed(0)}%</strong> setelah mendapatkan edukasi. Skor rata-rata yang lebih tinggi pada post-test mengindikasikan bahwa intervensi dan perawatan secara umum efektif dalam meningkatkan kesiapan pasien untuk mobilisasi.</p>
+            <p>Data menunjukkan adanya <strong>peningkatan skor pemahaman pasien sebesar ${improvement.toFixed(0)}%</strong> setelah mendapatkan edukasi. Skor rata-rata yang lebih tinggi pada post-test mengindikasikan bahwa intervensi dan perawatan secara umum efektif dalam meningkatkan pengetahuan dan kesiapan pasien untuk mobilisasi.</p>
         </div>
     `;
 }

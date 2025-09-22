@@ -321,6 +321,144 @@ async function deletePatient(patientId) {
     });
 }
 
+// --- TAMBAHAN ---
+// Tiga fungsi baru untuk mengelola data target
+
+/**
+ * Fungsi ini HANYA BERTUGAS untuk menampilkan data target di tabel.
+ * @param {string} patientId - ID pasien untuk menemukan baris tabel yang benar.
+ * @param {object} targetData - Objek yang berisi detail target (level, sugesti, setBy, dll).
+ */
+function displayTargetData(patientId, targetData) {
+    const row = document.querySelector(`tr[data-patient-id="${patientId}"]`);
+    if (!row) return;
+
+    const targetCell = row.querySelector('.target-cell');
+    const suggestionTextElement = row.querySelector('.suggestion-text');
+    const actionButtons = row.querySelector('.action-buttons');
+
+    const targetLevelInfo = appData.mobilityScale.find(l => l.level === targetData.targetLevel) || { name: targetData.targetText };
+    targetCell.innerHTML = `<span class="status status-level-${targetData.targetLevel}">${targetLevelInfo.name}</span>`;
+
+    let suggestionsHTML = `<strong>${targetData.primarySuggestion}</strong>`;
+    if (targetData.secondarySuggestions && targetData.secondarySuggestions.length > 0) {
+        suggestionsHTML += `<ul style="margin-top: 8px; padding-left: 18px; margin-bottom: 0;">`;
+        targetData.secondarySuggestions.forEach(sug => suggestionsHTML += `<li><small>${sug}</small></li>`);
+        suggestionsHTML += `</ul>`;
+    }
+
+    // Tambahkan badge berdasarkan siapa yang mengatur target
+    const badge = targetData.setBy === "AI"
+        ? `<span class="ai-badge" title="${targetData.rationale || 'Rekomendasi oleh AI'}">✨ AI</span>`
+        : `<span class="ai-badge fallback" title="Diubah oleh ${targetData.setBy}"><i class="fas fa-user-nurse"></i> Manual</span>`;
+    
+    suggestionTextElement.innerHTML = `${suggestionsHTML} ${badge}`;
+
+    // Tambahkan tombol "Ubah" jika belum ada
+    if (!actionButtons.querySelector('.edit-target-btn')) {
+        actionButtons.insertAdjacentHTML('afterbegin', `
+            <button class="btn btn--secondary btn--sm edit-target-btn" data-id="${patientId}" title="Ubah target mobilisasi">
+                <i class="fas fa-edit"></i> Ubah
+            </button>
+        `);
+    }
+}
+
+/**
+ * Fungsi ini menyimpan objek target ke Firestore di bawah field 'currentTarget'.
+ * @param {string} patientId - ID pasien yang akan diupdate.
+ * @param {object} plan - Objek rencana dari AI atau dari modal edit.
+ * @param {string} setBy - "AI" atau nama Perawat.
+ */
+async function saveTargetToDB(patientId, plan, setBy) {
+    if (!userId || !clinicId) return;
+    const docPath = `clinics/${clinicId}/patients/${patientId}`;
+    try {
+        await updateDoc(doc(db, docPath), {
+            currentTarget: {
+                ...plan,
+                setBy: setBy,
+                setAt: serverTimestamp()
+            }
+        });
+    } catch (error) {
+        console.error("Error saving target to DB:", error);
+        showToast("Gagal menyimpan target ke database.", "error");
+    }
+}
+
+/**
+ * Fungsi untuk membuka modal yang memungkinkan perawat mengedit target yang ada.
+ * @param {string} patientId - ID Pasien.
+ */
+function openEditTargetModal(patientId) {
+    const patient = allPatientsData.find(p => p.id === patientId);
+    if (!patient || !patient.currentTarget) {
+        return showToast("Data target tidak ditemukan, tunggu AI selesai.", "error");
+    }
+
+    const modalId = 'edit-target-modal';
+    const existingModal = document.getElementById(modalId);
+    if (existingModal) existingModal.remove();
+
+    const currentTarget = patient.currentTarget;
+    const modalHTML = `
+        <div id="${modalId}" class="modal-overlay">
+            <div class="modal-content" style="max-width: 500px;">
+                <div class="modal-header">
+                    <h3>Ubah Target untuk ${patient.name}</h3>
+                    <button class="modal-close-btn">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <p>Sesuaikan target mobilisasi berdasarkan penilaian klinis Anda.</p>
+                    <div class="form-group" style="margin-top: 16px;">
+                        <label for="edit-target-level" class="form-label">Target Level Baru</label>
+                        <select id="edit-target-level" class="form-control">
+                            ${appData.mobilityScale.map(level =>
+                                `<option value="${level.level}" ${level.level === currentTarget.targetLevel ? 'selected' : ''}>${level.name}</option>`
+                            ).join('')}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-primary-suggestion" class="form-label">Saran Utama</label>
+                        <textarea id="edit-primary-suggestion" class="form-control" rows="2">${currentTarget.primarySuggestion}</textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn--secondary modal-close-btn">Batal</button>
+                    <button id="save-edited-target-btn" class="btn btn--primary">Simpan Perubahan</button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+    const modal = document.getElementById(modalId);
+    setTimeout(() => modal.classList.remove('hidden'), 10);
+
+    const closeModal = () => modal.remove();
+
+    modal.querySelector('#save-edited-target-btn').addEventListener('click', () => {
+        const nurseName = document.getElementById('current-nurse-selector').value;
+        if (!nurseName) {
+            showToast("Pilih nama perawat Anda terlebih dahulu.", "warning");
+            return;
+        }
+
+        const newPlan = {
+            ...currentTarget, // Ambil data lama sebagai dasar
+            targetLevel: parseInt(document.getElementById('edit-target-level').value),
+            primarySuggestion: document.getElementById('edit-primary-suggestion').value
+            // Anda bisa menambahkan field lain jika mau
+        };
+
+        saveTargetToDB(patientId, newPlan, nurseName);
+        showToast("Target berhasil diperbarui!", "success");
+        closeModal();
+    });
+
+    modal.querySelectorAll('.modal-close-btn').forEach(btn => btn.addEventListener('click', closeModal));
+}
 
 // --- FUNGSI UTILITAS & RENDER ---
 
@@ -386,6 +524,17 @@ function setupEventListeners() {
         if (e.target.matches('.modal-close-btn') || e.target.matches('.modal-overlay')) {
             if(!document.getElementById('clinic-id-modal').classList.contains('hidden')) return;
             closePatientModal();
+        }
+	if (e.target.closest('.edit-target-btn')) {
+            const patientId = e.target.closest('.edit-target-btn').dataset.id;
+            openEditTargetModal(patientId);
+        }
+
+        if (e.target.matches('.modal-close-btn') || e.target.matches('.modal-overlay')) {
+            // ...
+            // Pastikan modal edit juga tertutup
+            const editModal = document.getElementById('edit-target-modal');
+            if (editModal) editModal.remove();
         }
     });
 }
@@ -531,34 +680,34 @@ async function renderPatientTable(patients) {
     });
     tableBody.innerHTML = patientRowsHTML.join('');
 
+    // GANTI DENGAN BLOK for...of YANG BARU INI
     for (const patient of patients) {
-        getAIPlan(patient).then(plan => {
-            const row = tableBody.querySelector(`tr[data-patient-id="${patient.id}"]`);
-            if (row) {
-                const targetCell = row.querySelector('.target-cell');
-                const suggestionCell = row.querySelector('.suggestion-cell');
-                
-                const targetLevelInfo = appData.mobilityScale.find(l => l.level === plan.targetLevel) || { name: plan.targetText };
-                targetCell.innerHTML = `<span class="status status-level-${plan.targetLevel}" title="Target: ${targetLevelInfo.name}\nTimeline: ${plan.targetTimeline}">${targetLevelInfo.name}</span>`;
-                
-                suggestionCell.querySelector('.loading-state').style.display = 'none';
-                const content = suggestionCell.querySelector('.suggestion-content');
-                const suggestionTextElement = content.querySelector('.suggestion-text');
+        const row = tableBody.querySelector(`tr[data-patient-id="${patient.id}"]`);
+        if (!row) continue;
 
-                let suggestionsHTML = `<strong>${plan.primarySuggestion}</strong>`;
-                if (plan.secondarySuggestions && plan.secondarySuggestions.length > 0) {
-                    suggestionsHTML += `<ul style="margin-top: 8px; padding-left: 18px; margin-bottom: 0;">`;
-                    plan.secondarySuggestions.forEach(sug => {
-                        suggestionsHTML += `<li><small>${sug}</small></li>`;
-                    });
-                    suggestionsHTML += `</ul>`;
-                }
+    // Tampilkan tombol aksi terlebih dahulu
+        const suggestionCell = row.querySelector('.suggestion-cell');
+        suggestionCell.querySelector('.loading-state').style.display = 'none';
+        suggestionCell.querySelector('.suggestion-content').style.display = 'block';
 
-                suggestionTextElement.innerHTML = `${suggestionsHTML} <span class="ai-badge">✨ AI</span>`;
-                suggestionTextElement.title = `Rasional AI: ${plan.rationale}`;
-                content.style.display = 'block';
-            }
-        });
+    // Logika Utama: Cek apakah pasien sudah punya target di database
+        if (patient.currentTarget) {
+        // Jika YA, langsung tampilkan data dari database
+            displayTargetData(patient.id, patient.currentTarget);
+        } else {
+        // Jika TIDAK, panggil AI untuk mendapatkan target,
+        // lalu simpan ke DB, baru tampilkan.
+            const targetCell = row.querySelector('.target-cell');
+            targetCell.innerHTML = `<div class="loading-state"><i class="fas fa-spinner fa-spin"></i> AI...</div>`;
+        
+            getAIPlan(patient).then(plan => {
+            // Simpan hasil AI ke database
+                saveTargetToDB(patient.id, plan, "AI");
+            // Tampilkan hasil AI yang baru disimpan
+            // (Kita tidak perlu menunggu listener onSnapshot karena kita sudah punya datanya)
+                displayTargetData(patient.id, { ...plan, setBy: "AI" });
+            });
+        }
     }
 }
 
@@ -1132,4 +1281,3 @@ function showConfirmationDialog(message, onConfirm) {
     };
     document.getElementById('confirm-cancel').onclick = closeDialog;
 }
-

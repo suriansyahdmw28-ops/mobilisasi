@@ -319,3 +319,22 @@ p:last-child { margin-bottom: 0; }
 .logo-image { height: 48px; width: auto; object-fit: contain; }
 .hero-logo { max-width: 120px; height: auto; margin-top: var(--space-24); }
 
+/* Tambahkan di akhir file style.css */
+.target-cell-content {
+    display: flex;
+    align-items: center;
+    gap: 8px; /* Jarak antara status dan ikon */
+    justify-content: space-between;
+}
+
+.edit-target-btn {
+    cursor: pointer;
+    color: var(--color-gray-400);
+    transition: color 200ms;
+    font-size: 14px;
+    padding: 4px;
+}
+
+.edit-target-btn:hover {
+    color: var(--color-primary);
+}

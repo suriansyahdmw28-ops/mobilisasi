@@ -329,16 +329,24 @@ async function deletePatient(patientId) {
  * @param {string} patientId - ID pasien untuk menemukan baris tabel yang benar.
  * @param {object} targetData - Objek yang berisi detail target (level, sugesti, setBy, dll).
  */
+// DENGAN FUNGSI BARU INI
 function displayTargetData(patientId, targetData) {
     const row = document.querySelector(`tr[data-patient-id="${patientId}"]`);
     if (!row) return;
 
     const targetCell = row.querySelector('.target-cell');
     const suggestionTextElement = row.querySelector('.suggestion-text');
-    const actionButtons = row.querySelector('.action-buttons');
 
     const targetLevelInfo = appData.mobilityScale.find(l => l.level === targetData.targetLevel) || { name: targetData.targetText };
-    targetCell.innerHTML = `<span class="status status-level-${targetData.targetLevel}">${targetLevelInfo.name}</span>`;
+    
+    // --- PERUBAHAN DI SINI ---
+    // Ikon edit sekarang ditambahkan langsung di sebelah status level
+    targetCell.innerHTML = `
+        <div class="target-cell-content">
+            <span class="status status-level-${targetData.targetLevel}">${targetLevelInfo.name}</span>
+            <i class="fas fa-pencil-alt edit-target-btn" data-id="${patientId}" title="Ubah Target"></i>
+        </div>
+    `;
 
     let suggestionsHTML = `<strong>${targetData.primarySuggestion}</strong>`;
     if (targetData.secondarySuggestions && targetData.secondarySuggestions.length > 0) {
@@ -347,21 +355,13 @@ function displayTargetData(patientId, targetData) {
         suggestionsHTML += `</ul>`;
     }
 
-    // Tambahkan badge berdasarkan siapa yang mengatur target
     const badge = targetData.setBy === "AI"
         ? `<span class="ai-badge" title="${targetData.rationale || 'Rekomendasi oleh AI'}">✨ AI</span>`
         : `<span class="ai-badge fallback" title="Diubah oleh ${targetData.setBy}"><i class="fas fa-user-nurse"></i> Manual</span>`;
     
     suggestionTextElement.innerHTML = `${suggestionsHTML} ${badge}`;
-
-    // Tambahkan tombol "Ubah" jika belum ada
-    if (!actionButtons.querySelector('.edit-target-btn')) {
-        actionButtons.insertAdjacentHTML('afterbegin', `
-            <button class="btn btn--secondary btn--sm edit-target-btn" data-id="${patientId}" title="Ubah target mobilisasi">
-                <i class="fas fa-edit"></i> Ubah
-            </button>
-        `);
-    }
+    
+    // Tombol "Ubah" tidak lagi ditambahkan di kolom aksi
 }
 
 /**
@@ -391,6 +391,7 @@ async function saveTargetToDB(patientId, plan, setBy) {
  * Fungsi untuk membuka modal yang memungkinkan perawat mengedit target yang ada.
  * @param {string} patientId - ID Pasien.
  */
+// DENGAN FUNGSI BARU YANG LEBIH SEDERHANA INI
 function openEditTargetModal(patientId) {
     const patient = allPatientsData.find(p => p.id === patientId);
     if (!patient || !patient.currentTarget) {
@@ -404,7 +405,7 @@ function openEditTargetModal(patientId) {
     const currentTarget = patient.currentTarget;
     const modalHTML = `
         <div id="${modalId}" class="modal-overlay">
-            <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-content" style="max-width: 450px;">
                 <div class="modal-header">
                     <h3>Ubah Target untuk ${patient.name}</h3>
                     <button class="modal-close-btn">&times;</button>
@@ -418,10 +419,6 @@ function openEditTargetModal(patientId) {
                                 `<option value="${level.level}" ${level.level === currentTarget.targetLevel ? 'selected' : ''}>${level.name}</option>`
                             ).join('')}
                         </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="edit-primary-suggestion" class="form-label">Saran Utama</label>
-                        <textarea id="edit-primary-suggestion" class="form-control" rows="2">${currentTarget.primarySuggestion}</textarea>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -445,11 +442,11 @@ function openEditTargetModal(patientId) {
             return;
         }
 
+        // --- PERUBAHAN DI SINI ---
+        // Kita hanya mengambil level baru dan mempertahankan saran yang lama
         const newPlan = {
-            ...currentTarget, // Ambil data lama sebagai dasar
+            ...currentTarget, // Ambil semua data lama (termasuk saran) sebagai dasar
             targetLevel: parseInt(document.getElementById('edit-target-level').value),
-            primarySuggestion: document.getElementById('edit-primary-suggestion').value
-            // Anda bisa menambahkan field lain jika mau
         };
 
         saveTargetToDB(patientId, newPlan, nurseName);

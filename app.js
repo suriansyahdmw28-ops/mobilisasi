@@ -499,7 +499,7 @@ async function renderPatientTable(patients) {
         } else if (painScore > 0) {
             painClass = 'status-level-2'; // Yellow for 1-3
         }
-
+	const currentMobilityInfo = appData.mobilityScale.find(l => l.level === latestObs.mobilityLevel) || { name: `Level ${latestObs.mobilityLevel}` };
         return `
             <tr data-patient-id="${p.id}">
                 <td><strong>${p.name}</strong><br><small>${p.rm}</small></td>
@@ -514,7 +514,7 @@ async function renderPatientTable(patients) {
                         <strong>Nyeri:</strong> <span class="status ${painClass}" style="padding: 2px 6px; font-size: 11px;">${painScore}/10</span>
                     </small>
                 </td>
-                <td><span class="status status-level-${latestObs.mobilityLevel}">Level ${latestObs.mobilityLevel}</span></td>
+                <td><span class="status status-level-${latestObs.mobilityLevel}">${currentMobilityInfo.name}</span></td>
                 <td class="target-cell"><div class="loading-state"><i class="fas fa-spinner fa-spin"></i> AI...</div></td>
                 <td class="suggestion-cell">
                     <div class="loading-state"><i class="fas fa-spinner fa-spin"></i> Menganalisis...</div>
@@ -539,7 +539,7 @@ async function renderPatientTable(patients) {
                 const suggestionCell = row.querySelector('.suggestion-cell');
                 
                 const targetLevelInfo = appData.mobilityScale.find(l => l.level === plan.targetLevel) || { name: plan.targetText };
-                targetCell.innerHTML = `<span class="status status-level-${plan.targetLevel}" title="Target: ${targetLevelInfo.name}\nTimeline: ${plan.targetTimeline}">${plan.targetText}</span>`;
+                targetCell.innerHTML = `<span class="status status-level-${plan.targetLevel}" title="Target: ${targetLevelInfo.name}\nTimeline: ${plan.targetTimeline}">${targetLevelInfo.name}</span>`;
                 
                 suggestionCell.querySelector('.loading-state').style.display = 'none';
                 const content = suggestionCell.querySelector('.suggestion-content');

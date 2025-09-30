@@ -338,3 +338,22 @@ p:last-child { margin-bottom: 0; }
 .edit-target-btn:hover {
     color: var(--color-primary);
 }
+
+/* YouTube Fullscreen Video Embed */
+.video-container {
+    position: relative;
+    width: 100%;
+    overflow: hidden;
+    padding-top: 56.25%; /* 16:9 Aspect Ratio */
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--color-border);
+}
+
+.video-container iframe {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    border: 0;
+}

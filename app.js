@@ -347,6 +347,7 @@ function displayTargetData(patientId, targetData) {
             'Dukungan Psikologis': 'fa-hand-holding-heart',
             'Nutrisi & Hidrasi': 'fa-utensils',
             'Keselamatan': 'fa-shield-alt',
+            'Peringatan Sistem': 'fa-exclamation-triangle',
             'Default': 'fa-lightbulb'
         };
 
@@ -787,13 +788,13 @@ Buat rencana intervensi yang sangat detail dan personal berdasarkan SEMUA variab
     Berdasarkan SOP di atas, berikan rencana dalam format JSON.`;
 
     try {
-        const apiKey = ""; // API Key will be injected by the environment
+        const apiKey = ""; // API Key akan disuntikkan oleh environment
         const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
-        
+
         const payload = {
             contents: [{ parts: [{ text: userQuery }] }],
             systemInstruction: { parts: [{ text: systemPrompt }] },
-             generationConfig: {
+            generationConfig: {
                 responseMimeType: "application/json",
             }
         };
@@ -805,28 +806,45 @@ Buat rencana intervensi yang sangat detail dan personal berdasarkan SEMUA variab
         });
 
         if (!response.ok) {
-            console.error("AI API Error:", response.status, response.statusText);
-            throw new Error('AI response not OK');
+            const errorBody = await response.json().catch(() => response.text());
+            console.error("AI API Error:", response.status, response.statusText, errorBody);
+            throw new Error(`AI response not OK: ${response.status}. Cek console untuk detail.`);
         }
 
         const result = await response.json();
-        const jsonString = result.candidates?.[0]?.content?.parts?.[0]?.text;
-        
-        if (jsonString) {
-            const parsedJson = JSON.parse(jsonString);
-            if (parsedJson.targetLevel && parsedJson.rasionalTarget && Array.isArray(parsedJson.saranDanAksi) && parsedJson.saranDanAksi.length > 0) {
-                return parsedJson;
-            }
+        const candidate = result.candidates?.[0];
+
+        if (!candidate || !candidate.content?.parts?.[0]?.text) {
+             // Ini bisa terjadi karena filter keamanan (safety filters)
+            console.error("AI response missing content. Full response:", JSON.stringify(result, null, 2));
+            throw new Error('Respons AI kosong atau diblokir, kemungkinan karena filter keamanan.');
         }
-        throw new Error('Invalid JSON response from AI');
+        
+        const jsonString = candidate.content.parts[0].text;
+
+        try {
+            const parsedJson = JSON.parse(jsonString);
+            if (typeof parsedJson.targetLevel === 'number' && parsedJson.rasionalTarget && Array.isArray(parsedJson.saranDanAksi)) {
+                return parsedJson; // Sukses
+            } else {
+                console.error("Struktur JSON dari AI tidak sesuai harapan.", parsedJson);
+                throw new Error('Struktur JSON dari AI tidak valid.');
+            }
+        } catch (parseError) {
+            console.error("Gagal mem-parsing JSON dari AI:", parseError);
+            console.error("String asli dari AI:", jsonString);
+            throw new Error('AI tidak mengembalikan format JSON yang valid.');
+        }
 
     } catch (error) {
-        console.warn("AI recommendation failed, falling back to rule-based logic.", error);
-        // Fallback logic can be enhanced but is kept simple for now
+        console.warn("Pembuatan rencana AI gagal, kembali ke mode observasi.", error);
         return {
             targetLevel: latestObs.mobilityLevel,
-            rasionalTarget: "Gagal memproses data AI, kembali ke mode observasi aman.",
-            saranDanAksi: [{ kategori: "Observasi", saran: "Terjadi kesalahan saat mengambil saran AI. <strong>Lanjutkan observasi manual</strong> dan laporkan jika terjadi perubahan kondisi signifikan." }]
+            rasionalTarget: "Gagal memproses data AI.",
+            saranDanAksi: [{ 
+                kategori: "Peringatan Sistem", 
+                saran: `Terjadi kesalahan saat mengambil saran AI (${error.message}). <strong>Gunakan penilaian klinis manual.</strong> Cek Developer Console (F12) untuk detail teknis.` 
+            }]
         };
     }
 }

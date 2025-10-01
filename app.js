@@ -1021,7 +1021,7 @@ function renderGlobalAnalysis() {
     renderQuestionnaireAnalysis(questionnaireData);
     renderPatientDashboardAnalysis(allPatientsData);
 }
-
+const safeDivide = (numerator, denominator) => (denominator > 0 ? numerator / denominator : 0);
 // GANTIKAN SELURUH FUNGSI renderQuestionnaireAnalysis LAMA DENGAN INI
 // GANTIKAN SELURUH FUNGSI LAMA DENGAN VERSI BARU YANG SUDAH DIPERBAIKI INI
 function renderQuestionnaireAnalysis(data) {
@@ -1059,37 +1059,38 @@ function renderQuestionnaireAnalysis(data) {
     };
 
     // Fungsi kalkulasi yang sudah disederhanakan dan lebih aman
-    const calculateDomainScores = (testData) => {
-        const results = {
-            pengetahuan: 0,
-            fungsiFisik: 0,
-            hambatanNyeri: 0,
-            total: 0
-        };
-        const respondentCount = testData.length;
-        if (respondentCount === 0) return results;
+    // GANTIKAN FUNGSI LAMA calculateDomainScores DENGAN VERSI BARU INI
+	const calculateDomainScores = (testData) => {
+    	const results = {
+        	pengetahuan: 0,
+        	fungsiFisik: 0,
+        	hambatanNyeri: 0,
+        	total: 0
+    	};
+    	const respondentCount = testData.length;
+    	if (respondentCount === 0) return results; // Jika tidak ada data, kembalikan nilai nol
 
-        for (const entry of testData) {
-            results.total += entry.totalScore;
-            for (const domain in questionDomains) {
-                for (const qId of questionDomains[domain]) {
-                    const question = appData.questionnaire.questions.find(q => q.id === qId);
-                    const answer = entry.answers[qId];
-                    if (question && answer) {
-                        results[domain] += appData.questionnaire.scoring[question.type][answer];
-                    }
-                }
-            }
-        }
+    	for (const entry of testData) {
+        	results.total += entry.totalScore;
+        	for (const domain in questionDomains) {
+            	for (const qId of questionDomains[domain]) {
+                	const question = appData.questionnaire.questions.find(q => q.id === qId);
+                	const answer = entry.answers[qId];
+                	if (question && answer) {
+                    results[domain] += appData.questionnaire.scoring[question.type][answer];
+                	}
+            	}
+        	}
+    	}
 
-        // Hitung rata-rata di akhir, pastikan tidak ada pembagian dengan nol
-        return {
-            pengetahuan: results.pengetahuan / respondentCount,
-            fungsiFisik: results.fungsiFisik / respondentCount,
-            hambatanNyeri: results.hambatanNyeri / respondentCount,
-            total: results.total / respondentCount
-        };
-    };
+    // Hitung rata-rata di akhir menggunakan safeDivide
+    	return {
+        	pengetahuan: safeDivide(results.pengetahuan, respondentCount),
+        	fungsiFisik: safeDivide(results.fungsiFisik, respondentCount),
+        	hambatanNyeri: safeDivide(results.hambatanNyeri, respondentCount),
+        	total: safeDivide(results.total, respondentCount)
+    	};
+	};
 
     const avgPreScores = calculateDomainScores(preTests);
     const avgPostScores = calculateDomainScores(postTests);

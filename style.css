@@ -186,11 +186,12 @@ p:last-child { margin-bottom: 0; }
 .patient-table td {
     font-size: var(--font-size-sm);
 }
-
-.patient-table th:nth-child(1), .patient-table td:nth-child(1) { width: 15%; min-width: 170px; } 
+/* MODIFIED: Reduced min-width for better responsiveness */
+.patient-table th:nth-child(1), .patient-table td:nth-child(1) { width: 15%; min-width: 150px; } 
 .patient-table th:nth-child(2), .patient-table td:nth-child(2) { width: 8%; min-width: 80px; } 
 .patient-table th:nth-child(7), .patient-table td:nth-child(7) { width: 5%; min-width: 60px; text-align: center; }
-.patient-table th:nth-child(9), .patient-table td:nth-child(9) { width: 26%; min-width: 260px; white-space: normal; } 
+/* MODIFIED: Reduced min-width for better responsiveness */
+.patient-table th:nth-child(9), .patient-table td:nth-child(9) { width: 26%; min-width: 240px; white-space: normal; } 
 
 .suggestion-text {
     white-space: normal;
@@ -256,7 +257,9 @@ p:last-child { margin-bottom: 0; }
     box-shadow: var(--shadow-sm);
     transition: box-shadow var(--duration-normal) var(--ease-standard);
     position: relative;
-    min-height: 380px;
+    /* MODIFIED: More flexible height */
+    min-height: 320px; 
+    height: 100%;
 }
 .chart-container:hover {
     box-shadow: var(--shadow-md);

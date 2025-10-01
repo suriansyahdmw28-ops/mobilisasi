@@ -673,7 +673,6 @@ async function renderPatientTable(patients) {
     }
 }
 
-
 async function getAIPlan(patient) {
     const latestObs = patient.latestObservation || { mobilityLevel: 1, ponv: 'Tidak ada keluhan', rass: '0: Alert & Calm', painScale: 0, notes: '' };
     const hoursPostOp = (Date.now() - (getSecondsFromTS(patient.surgeryFinishTime) * 1000)) / (3600 * 1000);
@@ -681,14 +680,13 @@ async function getAIPlan(patient) {
     // --- PROMPT BARU YANG LEBIH BAIK ---
     const systemPrompt = `Anda adalah seorang Perawat Spesialis Klinis senior dengan keahlian program ERAS (Enhanced Recovery After Surgery) di Indonesia. Tugas Anda adalah memberikan rencana mobilisasi dini yang personal, holistik, dan penuh empati. Jawaban WAJIB dalam format JSON.
 
-    Fokus Anda bukan hanya pada level fisik, tetapi juga pada kondisi psikologis pasien, hambatan yang mungkin ada, dan peran edukasi. Berikan saran yang tidak terduga namun aman dan efektif.
+    Fokus Anda bukan hanya pada level fisik, tetapi juga pada kondisi psikologis pasien, hambatan yang mungkin ada, dan peran edukasi. Berikan saran yang aman dan efektif.
 
     Format JSON yang WAJIB diikuti:
     {
       "targetLevel": integer,
       "saranUtama": string,
-      "saranPendukung": [string],
-      "rasionalKlinis": string
+      "saranPendukung": [string]
     }
 
     PANDUAN BERPIKIR ANDA:
@@ -697,8 +695,7 @@ async function getAIPlan(patient) {
     3.  PROGRESI KREATIF (JIKA AMAN): Jika tidak ada red flag, pikirkan progresi yang bermakna.
         - 'targetLevel': Naikkan SATU level dari level saat ini sebagai target realistis berikutnya.
         - 'saranUtama': Buat satu kalimat aksi yang sangat jelas, terukur, dan memotivasi. CONTOH: "Ajak pasien untuk berdiri dan menyikat gigi di wastafel samping tempat tidur dengan bantuan." (Ini lebih baik daripada "Bantu pasien berdiri").
-        - 'saranPendukung': Berikan 2-3 saran kreatif. Pikirkan di luar kebiasaan. CONTOH: "Putar lagu favorit pasien untuk membangkitkan semangat saat latihan.", "Ajarkan teknik pernapasan dalam untuk mengelola nyeri saat bergerak.", "Libatkan keluarga untuk membuat 'papan target' kecil di samping tempat tidur."
-    4.  RASIONALISASI: Jelaskan di 'rasionalKlinis' MENGAPA Anda merekomendasikan ini. Hubungkan dengan jenis operasi, waktu pasca-op, dan data unik dari pasien tersebut.`;
+        - 'saranPendukung': Berikan 2-3 saran kreatif. Pikirkan di luar kebiasaan. CONTOH: "Putar lagu favorit pasien untuk membangkitkan semangat saat latihan.", "Ajarkan teknik pernapasan dalam untuk mengelola nyeri saat bergerak.", "Libatkan keluarga untuk membuat 'papan target' kecil di samping tempat tidur."`;
 
     const userQuery = `
     Data Pasien:
@@ -716,8 +713,7 @@ async function getAIPlan(patient) {
     Berdasarkan data di atas, berikan rekomendasi mobilisasi dalam format JSON yang diminta.`;
 
     try {
-        const apiKey = "";
-        // Model tetap menggunakan flash sesuai standar, namun prompt yang lebih baik akan memberikan hasil superior
+        const apiKey = ""; // Masukkan API Key Anda di sini
         const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
         
         const payload = {
@@ -745,7 +741,9 @@ async function getAIPlan(patient) {
         if (jsonString) {
             const parsedJson = JSON.parse(jsonString);
             // Validasi field baru
-            if (parsedJson.targetLevel && parsedJson.saranUtama && parsedJson.rasionalKlinis) {
+            if (parsedJson.targetLevel && parsedJson.saranUtama) {
+                // Tambahkan rasionalKlinis kosong agar struktur data tetap konsisten jika diperlukan di tempat lain
+                parsedJson.rasionalKlinis = parsedJson.rasionalKlinis || 'Dihasilkan oleh AI';
                 return parsedJson;
             }
         }

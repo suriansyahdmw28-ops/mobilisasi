@@ -333,18 +333,13 @@ function displayTargetData(patientId, targetData) {
     
     targetCell.innerHTML = `
         <div class="target-cell-content">
-            <span class="status status-level-${targetData.targetLevel}">${targetLevelInfo.name}</span>
+            <span class="status status-level-${targetData.targetLevel} small-font">${targetLevelInfo.name}</span>
             <i class="fas fa-pencil-alt edit-target-btn" data-id="${patientId}" title="Ubah Target"></i>
         </div>
     `;
 
-    // Menggunakan nama field baru dari AI prompt: saranUtama, saranPendukung, rasionalKlinis
-    let suggestionsHTML = `<strong>${targetData.saranUtama}</strong>`;
-    if (targetData.saranPendukung && targetData.saranPendukung.length > 0) {
-        suggestionsHTML += `<ul style="margin-top: 8px; padding-left: 18px; margin-bottom: 0;">`;
-        targetData.saranPendukung.forEach(sug => suggestionsHTML += `<li><small>${sug}</small></li>`);
-        suggestionsHTML += `</ul>`;
-    }
+    // Langsung tampilkan saranHolistik di kolom tabel
+    const suggestionsHTML = targetData.saranHolistik || 'Tidak ada saran.';
 
     const badge = targetData.setBy === "AI"
         ? `<span class="ai-badge" title="${targetData.rasionalKlinis || 'Rekomendasi oleh AI'}">✨ AI</span>`
@@ -352,6 +347,7 @@ function displayTargetData(patientId, targetData) {
     
     suggestionTextElement.innerHTML = `${suggestionsHTML} ${badge}`;
 }
+
 
 async function saveTargetToDB(patientId, plan, setBy) {
     if (!userId || !clinicId) return;
@@ -634,7 +630,7 @@ async function renderPatientTable(patients) {
                         <strong>Nyeri:</strong> <span class="status ${painClass}" style="padding: 2px 6px; font-size: 11px;">${painScore}/10</span>
                     </small>
                 </td>
-                <td><span class="status status-level-${latestObs.mobilityLevel}">${currentMobilityInfo.name}</span></td>
+                <td><span class="status status-level-${latestObs.mobilityLevel} small-font">${currentMobilityInfo.name}</span></td>
                 <td class="target-cell"><div class="loading-state"><i class="fas fa-spinner fa-spin"></i> AI...</div></td>
                 <td class="suggestion-cell">
                     <div class="loading-state"><i class="fas fa-spinner fa-spin"></i> Menganalisis...</div>
@@ -677,25 +673,24 @@ async function getAIPlan(patient) {
     const latestObs = patient.latestObservation || { mobilityLevel: 1, ponv: 'Tidak ada keluhan', rass: '0: Alert & Calm', painScale: 0, notes: '' };
     const hoursPostOp = (Date.now() - (getSecondsFromTS(patient.surgeryFinishTime) * 1000)) / (3600 * 1000);
 
-    // --- PROMPT BARU YANG LEBIH BAIK ---
     const systemPrompt = `Anda adalah seorang Perawat Spesialis Klinis senior dengan keahlian program ERAS (Enhanced Recovery After Surgery) di Indonesia. Tugas Anda adalah memberikan rencana mobilisasi dini yang personal, holistik, dan penuh empati. Jawaban WAJIB dalam format JSON.
 
-    Fokus Anda bukan hanya pada level fisik, tetapi juga pada kondisi psikologis pasien, hambatan yang mungkin ada, dan peran edukasi. Berikan saran yang aman dan efektif.
+    Fokus Anda bukan hanya pada level fisik, tetapi juga pada kondisi psikologis pasien, hambatan yang mungkin ada, dan peran edukasi. Berikan saran yang aman dan efektif. Anda memiliki kebebasan penuh untuk memberikan saran sekreatif dan seholistik mungkin.
 
     Format JSON yang WAJIB diikuti:
     {
       "targetLevel": integer,
-      "saranUtama": string,
-      "saranPendukung": [string]
+      "saranHolistik": string,
+      "rasionalKlinis": string
     }
 
     PANDUAN BERPIKIR ANDA:
     1.  ANALISIS HOLISTIK: Lihat data pasien secara keseluruhan. Apa cerita di balik angka-angka ini? Apakah ada 'Catatan Tambahan' yang krusial? (Contoh: 'pasien cemas', 'keluarga sangat suportif'). Gunakan informasi ini untuk mempersonalisasi saran.
-    2.  KESELAMATAN UTAMA (RED FLAGS): Identifikasi red flags (Nyeri > 4, PONV aktif, RASS abnormal, efek anestesi spinal < 12 jam). Jika ada, JANGAN NAIKKAN LEVEL. Fokuskan 'saranUtama' untuk mengatasi red flag tersebut.
+    2.  KESELAMATAN UTAMA (RED FLAGS): Identifikasi red flags (Nyeri > 4, PONV aktif, RASS abnormal, efek anestesi spinal < 12 jam). Jika ada, JANGAN NAIKKAN LEVEL. Fokuskan 'saranHolistik' untuk mengatasi red flag tersebut.
     3.  PROGRESI KREATIF (JIKA AMAN): Jika tidak ada red flag, pikirkan progresi yang bermakna.
         - 'targetLevel': Naikkan SATU level dari level saat ini sebagai target realistis berikutnya.
-        - 'saranUtama': Buat satu kalimat aksi yang sangat jelas, terukur, dan memotivasi. CONTOH: "Ajak pasien untuk berdiri dan menyikat gigi di wastafel samping tempat tidur dengan bantuan." (Ini lebih baik daripada "Bantu pasien berdiri").
-        - 'saranPendukung': Berikan 2-3 saran kreatif. Pikirkan di luar kebiasaan. CONTOH: "Putar lagu favorit pasien untuk membangkitkan semangat saat latihan.", "Ajarkan teknik pernapasan dalam untuk mengelola nyeri saat bergerak.", "Libatkan keluarga untuk membuat 'papan target' kecil di samping tempat tidur."`;
+        - 'saranHolistik': Berikan saran dalam format HTML (gunakan <strong>, <ul>, <li>). Buat 1 saran utama yang tebal, diikuti oleh 2-3 poin pendukung dalam bentuk daftar. Jadilah kreatif, motivasional, dan personal. CONTOH: "<strong>Ajak pasien menyikat gigi sambil berdiri di wastafel.</strong><ul><li>Putar lagu favoritnya untuk semangat.</li><li>Libatkan keluarga untuk memberi pujian.</li></ul>"
+        - 'rasionalKlinis': Jelaskan secara singkat mengapa Anda merekomendasikan ini.`;
 
     const userQuery = `
     Data Pasien:
@@ -740,10 +735,7 @@ async function getAIPlan(patient) {
         
         if (jsonString) {
             const parsedJson = JSON.parse(jsonString);
-            // Validasi field baru
-            if (parsedJson.targetLevel && parsedJson.saranUtama) {
-                // Tambahkan rasionalKlinis kosong agar struktur data tetap konsisten jika diperlukan di tempat lain
-                parsedJson.rasionalKlinis = parsedJson.rasionalKlinis || 'Dihasilkan oleh AI';
+            if (parsedJson.targetLevel && parsedJson.saranHolistik) {
                 return parsedJson;
             }
         }
@@ -762,53 +754,115 @@ function getRuleBasedPlan(patient) {
     const majorOps = ['Laparotomy', 'Mastectomy', 'ORIF', 'ROI'];
     const isMajorOp = majorOps.some(op => patient.operation.includes(op));
 
-    let plan = {
-        targetLevel: currentLevel,
-        saranUtama: "",
-        saranPendukung: [],
-        rasionalKlinis: ""
-    };
+    let plans = [];
 
+    // --- OPSI-OPSI KETIKA ADA HAMBATAN (RED FLAGS) ---
     if (latestObs.painScale > 4) {
-        plan.saranUtama = "Prioritaskan manajemen nyeri, kolaborasi dengan dokter.";
-        plan.saranPendukung = ["Lakukan asesmen ulang nyeri 30 menit setelah intervensi."];
-        plan.rasionalKlinis = "Nyeri > 4 menghambat partisipasi pasien. Mobilisasi ditunda sampai nyeri terkontrol.";
+        plans.push({
+            targetLevel: currentLevel,
+            saranHolistik: "<strong>Prioritaskan manajemen nyeri.</strong><ul><li>Kolaborasi analgesik dengan dokter.</li><li>Ajarkan teknik napas dalam.</li></ul>",
+            rasionalKlinis: "Nyeri > 4 adalah penghalang utama mobilisasi. Atasi nyeri sebelum progresi."
+        });
+        plans.push({
+            targetLevel: currentLevel,
+            saranHolistik: "<strong>Fokus pada kenyamanan pasien.</strong><ul><li>Tawarkan kompres hangat/dingin.</li><li>Alihkan perhatian dengan musik/TV.</li></ul>",
+            rasionalKlinis: "Teknik non-farmakologis dapat membantu menurunkan persepsi nyeri dan meningkatkan toleransi pasien."
+        });
     } else if (latestObs.ponv !== 'Tidak ada keluhan') {
-        plan.saranUtama = "Atasi mual/muntah sesuai advis medis.";
-        plan.saranPendukung = ["Pastikan hidrasi cukup."];
-        plan.rasionalKlinis = "PONV meningkatkan risiko dehidrasi dan kelelahan. Stabilkan kondisi sebelum mobilisasi.";
+        plans.push({
+            targetLevel: currentLevel,
+            saranHolistik: "<strong>Atasi mual & muntah (PONV).</strong><ul><li>Berikan antiemetik sesuai advis.</li><li>Anjurkan minum air putih sedikit-sedikit.</li></ul>",
+            rasionalKlinis: "PONV dapat menyebabkan dehidrasi dan kelemahan, menunda kemampuan mobilisasi."
+        });
+        plans.push({
+            targetLevel: currentLevel,
+            saranHolistik: "<strong>Jaga hidrasi & nutrisi ringan.</strong><ul><li>Tawarkan teh hangat atau biskuit.</li><li>Hindari bau menyengat di sekitar pasien.</li></ul>",
+            rasionalKlinis: "Memastikan pasien terhidrasi dan nyaman secara gastrointestinal adalah fondasi sebelum aktivitas fisik."
+        });
     } else if (!latestObs.rass.startsWith('0:')) {
-        plan.saranUtama = "Lanjutkan observasi tingkat kesadaran.";
-        plan.saranPendukung = ["Laporkan jika RASS tidak kembali ke 0."];
-        plan.rasionalKlinis = "Pasien harus sadar penuh (RASS 0) untuk dapat mengikuti instruksi mobilisasi dengan aman.";
+        plans.push({
+            targetLevel: currentLevel,
+            saranHolistik: "<strong>Observasi tingkat kesadaran.</strong><ul><li>Lakukan re-orientasi (waktu, tempat, orang).</li><li>Pastikan bel panggil mudah dijangkau.</li></ul>",
+            rasionalKlinis: "Kesadaran penuh (RASS 0) adalah syarat mutlak untuk mobilisasi yang aman dan kooperatif."
+        });
     } else if (patient.anesthesia.toLowerCase().includes('spinal') && hoursPostOp < 12) {
-        plan.targetLevel = 1;
-        plan.saranUtama = "Fokus pada miring kanan/kiri setiap 2 jam.";
-        plan.saranPendukung = ["Awasi tanda-tanda vital dan sensori motorik ekstremitas bawah."];
-        plan.rasionalKlinis = `Efek anestesi spinal masih berpengaruh dalam 12 jam pertama, batasi mobilisasi di tempat tidur.`;
+        plans.push({
+            targetLevel: 1,
+            saranHolistik: "<strong>Pemulihan anestesi spinal.</strong><ul><li>Fokus miring kanan/kiri tiap 2 jam.</li><li>Latih gerak pergelangan kaki.</li></ul>",
+            rasionalKlinis: "Risiko hipotensi ortostatik masih tinggi. Fokus pada pencegahan komplikasi imobilitas di tempat tidur."
+        });
     } else {
+        // --- OPSI-OPSI KETIKA PASIEN STABIL & SIAP PROGRESI ---
         let nextLevel = currentLevel + 1;
-        let calculatedTarget = currentLevel;
-        if (isMajorOp) {
-            if (hoursPostOp < 24) calculatedTarget = 2; else calculatedTarget = 3;
-        } else {
-            if (hoursPostOp < 12) calculatedTarget = 3; else calculatedTarget = 4;
-        }
-        plan.targetLevel = Math.min(nextLevel, calculatedTarget, 8);
+        
+        // Opsi 1: Progresi standar
+        plans.push({
+            targetLevel: nextLevel,
+            saranHolistik: `<strong>Ayo coba ke Level ${nextLevel}!</strong><ul><li>Bantu pasien duduk di tepi tempat tidur.</li><li>Observasi TTV & keluhan pusing.</li></ul>`,
+            rasionalKlinis: "Pasien stabil, progresi bertahap adalah langkah logis untuk mempercepat pemulihan."
+        });
 
-        if (plan.targetLevel > currentLevel) {
-            plan.saranUtama = `Bantu pasien untuk mencapai Level ${plan.targetLevel} secara bertahap.`;
-            plan.saranPendukung = ["Observasi respon pasien terhadap perubahan posisi.", "Edukasi pentingnya mobilisasi."];
-            plan.rasionalKlinis = `Pasien stabil. Progresi ke level selanjutnya dianjurkan untuk mempercepat pemulihan.`;
-        } else {
-            plan.saranUtama = `Pertahankan Level ${currentLevel} dan dorong latihan aktif.`;
-            plan.saranPendukung = ["Observasi TTV sebelum & sesudah latihan."];
-            plan.rasionalKlinis = `Pasien sudah mencapai target untuk fase ini. Fokus pada penguatan di level saat ini.`;
+        // Opsi 2: Progresi dengan edukasi
+        plans.push({
+            targetLevel: nextLevel,
+            saranHolistik: `<strong>Edukasi sambil bergerak.</strong><ul><li>Jelaskan manfaat duduk untuk paru-paru.</li><li>Ajak pasien tarik napas dalam saat duduk.</li></ul>`,
+            rasionalKlinis: "Menggabungkan tindakan dengan edukasi meningkatkan pemahaman dan kepatuhan pasien."
+        });
+
+        // Opsi 3: Melibatkan keluarga
+        plans.push({
+            targetLevel: nextLevel,
+            saranHolistik: `<strong>Libatkan keluarga sebagai supporter!</strong><ul><li>Minta keluarga memberi semangat.</li><li>Biarkan keluarga membantu memegang tangan pasien.</li></ul>`,
+            rasionalKlinis: "Dukungan keluarga terbukti secara psikologis meningkatkan motivasi dan mengurangi kecemasan pasien."
+        });
+
+        // Opsi 4: Fungsional & Bermakna
+        plans.push({
+            targetLevel: nextLevel,
+            saranHolistik: `<strong>Lakukan aktivitas fungsional.</strong><ul><li>Jika target berdiri, ajak berdiri untuk sikat gigi.</li><li>Jika target jalan, ajak jalan ke kamar mandi dengan bantuan.</li></ul>`,
+            rasionalKlinis: "Menghubungkan mobilisasi dengan aktivitas sehari-hari (ADL) membuatnya lebih bermakna bagi pasien."
+        });
+
+        // Opsi 5: Gamifikasi / Membuatnya menyenangkan
+        plans.push({
+            targetLevel: nextLevel,
+            saranHolistik: `<strong>Buat target kecil yang menyenangkan.</strong><ul><li>Putar lagu favorit pasien saat latihan.</li><li>Buat 'papan kemajuan' sederhana di samping tempat tidur.</li></ul>`,
+            rasionalKlinis: "Elemen permainan atau kesenangan dapat mengurangi persepsi tugas sebagai beban dan meningkatkan partisipasi."
+        });
+
+        // --- OPSI-OPSI KETIKA MEMPERTAHANKAN LEVEL SAAT INI ---
+        if (plans.length === 0 || Math.random() > 0.5) { // Tambahkan variasi untuk mempertahankan level
+            plans.push({
+                targetLevel: currentLevel,
+                saranHolistik: `<strong>Kuatkan di Level ${currentLevel}.</strong><ul><li>Tingkatkan durasi (misal: duduk lebih lama).</li><li>Tingkatkan frekuensi (misal: 3x sehari).</li></ul>`,
+                rasionalKlinis: "Konsolidasi di level saat ini membangun daya tahan sebelum melangkah ke level yang lebih berat."
+            });
+            plans.push({
+                targetLevel: currentLevel,
+                saranHolistik: `<strong>Latihan penguatan otot.</strong><ul><li>Anjurkan latihan mengencangkan otot paha/betis.</li><li>Latih angkat kaki bergantian jika memungkinkan.</li></ul>`,
+                rasionalKlinis: "Meningkatkan kekuatan otot inti dan ekstremitas bawah adalah persiapan krusial untuk berjalan."
+            });
+            plans.push({
+                targetLevel: currentLevel,
+                saranHolistik: `<strong>Fokus pada teknik pernapasan.</strong><ul><li>Lanjutkan batuk efektif dan napas dalam.</li><li>Pastikan pasien melakukannya dengan benar.</li></ul>`,
+                rasionalKlinis: "Fungsi pernapasan yang optimal adalah prioritas, bahkan ketika level mobilisasi statis."
+            });
         }
     }
-    
-    plan.saranUtama += ' <span class="ai-badge fallback">Fallback</span>';
-    return plan;
+
+    // Jika tidak ada plan yang cocok (seharusnya tidak terjadi), berikan plan default
+    if (plans.length === 0) {
+        plans.push({
+            targetLevel: currentLevel,
+            saranHolistik: "<strong>Observasi kondisi pasien.</strong><ul><li>Monitor TTV secara berkala.</li><li>Pastikan pasien nyaman.</li></ul>",
+            rasionalKlinis: "Observasi berkelanjutan penting untuk mendeteksi perubahan kondisi pasien."
+        });
+    }
+
+    // Pilih salah satu rencana secara acak dari opsi yang tersedia
+    const selectedPlan = plans[Math.floor(Math.random() * plans.length)];
+    selectedPlan.saranHolistik += ' <span class="ai-badge fallback">Fallback</span>';
+    return selectedPlan;
 }
 
 

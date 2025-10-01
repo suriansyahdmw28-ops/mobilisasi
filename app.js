@@ -1018,110 +1018,103 @@ function renderGlobalAnalysis() {
 }
 
 // GANTIKAN SELURUH FUNGSI renderQuestionnaireAnalysis LAMA DENGAN INI
+// GANTIKAN SELURUH FUNGSI LAMA DENGAN VERSI BARU YANG SUDAH DIPERBAIKI INI
 function renderQuestionnaireAnalysis(data) {
     const container = document.getElementById('questionnaire-analysis-container');
-    if (!data || data.length < 2) {
-        container.innerHTML = `<div class="info-card"><p>Belum ada data kuesioner yang cukup untuk dianalisis (dibutuhkan min. 1 pre-test dan 1 post-test).</p></div>`;
+
+    const preTests = data.filter(d => d.testType === 'pretest');
+    const postTests = data.filter(d => d.testType === 'posttest');
+
+    // Cek data yang lebih ketat: jika salah satu kosong, tampilkan pesan dan jangan lanjutkan analisis agregat
+    if (preTests.length === 0 || postTests.length === 0) {
+        // Tampilkan kembali elemen-elemen HTML sebelum mengisi pesan
+        container.innerHTML = `
+            <div class="analysis-grid">
+                <div class="stat-card"><div class="stat-icon"><i class="fas fa-question-circle"></i></div><div class="stat-content"><div class="stat-value">-</div><div class="stat-label">Rata-rata Skor Pre-Test</div></div></div>
+                <div class="stat-card"><div class="stat-icon"><i class="fas fa-check-circle"></i></div><div class="stat-content"><div class="stat-value">-</div><div class="stat-label">Rata-rata Skor Post-Test</div></div></div>
+                <div class="stat-card success"><div class="stat-icon"><i class="fas fa-arrow-up"></i></div><div class="stat-content"><div class="stat-value">- %</div><div class="stat-label">Peningkatan Pemahaman</div></div></div>
+            </div>
+            <div class="chart-container" style="margin-top: 24px;"><h4>Perbandingan Skor per Domain (Pre vs. Post Intervensi)</h4><canvas id="domain-analysis-chart"></canvas></div>
+            <div class="interpretation-card" id="questionnaire-interpretation"></div>
+            <div class="analysis-section" style="margin-top: 32px;"><h3 class="section-title"><i class="fas fa-user-check"></i> Analisis Peningkatan per Pasien</h3><div class="table-container" id="individual-questionnaire-results"></div></div>
+        `;
+        
+        document.getElementById('questionnaire-interpretation').innerHTML = `<div class="info-card"><p>Analisis agregat belum dapat ditampilkan. Dibutuhkan minimal 1 data Pre-Test dan 1 data Post-Test untuk perbandingan.</p></div>`;
+        
+        if (window.renderIndividualQuestionnaireAnalysis) {
+            renderIndividualQuestionnaireAnalysis(data);
+        }
         return;
     }
 
-    // 1. Definisikan domain untuk setiap pertanyaan
     const questionDomains = {
         pengetahuan: [1, 2, 3, 4, 9, 10],
-        fungsiFisik: [7, 8], // Mengukur persepsi pasien tentang kemampuan fisiknya
-        hambatanNyeri: [5, 6] // Mengukur sejauh mana nyeri mengganggu pasien
+        fungsiFisik: [7, 8],
+        hambatanNyeri: [5, 6]
     };
 
-    // 2. Fungsi untuk menghitung skor rata-rata per domain
+    // Fungsi kalkulasi yang sudah disederhanakan dan lebih aman
     const calculateDomainScores = (testData) => {
         const results = {
-            pengetahuan: { score: 0, count: 0 },
-            fungsiFisik: { score: 0, count: 0 },
-            hambatanNyeri: { score: 0, count: 0 },
-            total: { score: 0, count: 0 }
+            pengetahuan: 0,
+            fungsiFisik: 0,
+            hambatanNyeri: 0,
+            total: 0
         };
-        if (testData.length === 0) return results;
+        const respondentCount = testData.length;
+        if (respondentCount === 0) return results;
 
         for (const entry of testData) {
-            results.total.score += entry.totalScore;
-            results.total.count++;
+            results.total += entry.totalScore;
             for (const domain in questionDomains) {
                 for (const qId of questionDomains[domain]) {
                     const question = appData.questionnaire.questions.find(q => q.id === qId);
                     const answer = entry.answers[qId];
                     if (question && answer) {
-                        results[domain].score += appData.questionnaire.scoring[question.type][answer];
-                        results[domain].count++;
+                        results[domain] += appData.questionnaire.scoring[question.type][answer];
                     }
                 }
             }
         }
 
-        // Hitung rata-rata
-        const avgResults = {};
-        for (const domain in results) {
-             // Rata-rata per domain adalah total skor dibagi jumlah responden untuk domain tsb
-            const totalRespondents = testData.length;
-            const questionsInDomain = questionDomains[domain] ? questionDomains[domain].length : appData.questionnaire.questions.length;
-            if(totalRespondents > 0){
-                 avgResults[domain] = (results[domain].score / totalRespondents);
-            } else {
-                 avgResults[domain] = 0;
-            }
-        }
-        avgResults.total = results.total.score / results.total.count;
-        return avgResults;
+        // Hitung rata-rata di akhir, pastikan tidak ada pembagian dengan nol
+        return {
+            pengetahuan: results.pengetahuan / respondentCount,
+            fungsiFisik: results.fungsiFisik / respondentCount,
+            hambatanNyeri: results.hambatanNyeri / respondentCount,
+            total: results.total / respondentCount
+        };
     };
-
-    // 3. Pisahkan data pre dan post test, lalu hitung skornya
-    const preTests = data.filter(d => d.testType === 'pretest');
-    const postTests = data.filter(d => d.testType === 'posttest');
 
     const avgPreScores = calculateDomainScores(preTests);
     const avgPostScores = calculateDomainScores(postTests);
+    
+    // Kalkulasi peningkatan yang lebih jelas: peningkatan poin persentase
+    const scoreIncrease = avgPostScores.total - avgPreScores.total;
+    const improvementPercentage = (scoreIncrease / appData.questionnaire.questions.length) * 100;
 
-    const improvement = avgPreScores.total > 0 ? ((avgPostScores.total - avgPreScores.total) / (appData.questionnaire.questions.length)) * 100 : (avgPostScores.total > 0 ? 100 : 0);
-
-    // 4. Update kartu statistik
+    // Update kartu statistik
     document.getElementById('avg-pre-score').textContent = avgPreScores.total.toFixed(1);
     document.getElementById('avg-post-score').textContent = avgPostScores.total.toFixed(1);
-    document.getElementById('score-improvement').textContent = `${improvement.toFixed(0)}%`;
+    document.getElementById('score-improvement').textContent = `${improvementPercentage.toFixed(0)}%`;
 
-    // 5. Render Chart Analisis Domain
-    const chartData = {
+    // Render Chart
+    renderChart('domain-analysis-chart', 'bar', {
         labels: ['Pengetahuan', 'Fungsi Fisik & Keyakinan', 'Hambatan Nyeri'],
-        datasets: [
-            {
-                label: 'Skor Rata-rata Pre-Test',
-                data: [
-                    avgPreScores.pengetahuan,
-                    avgPreScores.fungsiFisik,
-                    avgPreScores.hambatanNyeri
-                ],
-                backgroundColor: 'rgba(var(--color-warning-rgb), 0.6)',
-                borderColor: 'rgba(var(--color-warning-rgb), 1)',
-                borderWidth: 1,
-                borderRadius: 4
-            },
-            {
-                label: 'Skor Rata-rata Post-Test',
-                data: [
-                    avgPostScores.pengetahuan,
-                    avgPostScores.fungsiFisik,
-                    avgPostScores.hambatanNyeri
-                ],
-                backgroundColor: 'rgba(var(--color-success-rgb), 0.7)',
-                borderColor: 'rgba(var(--color-success-rgb), 1)',
-                borderWidth: 1,
-                borderRadius: 4
-            }
-        ]
-    };
-    renderChart('domain-analysis-chart', 'bar', chartData, {
-        scales: { y: { beginAtZero: true, suggestedMax: 2 } } // Sesuaikan suggestedMax jika jumlah soal per domain berubah
+        datasets: [{
+            label: 'Skor Rata-rata Pre-Test',
+            data: [avgPreScores.pengetahuan, avgPreScores.fungsiFisik, avgPreScores.hambatanNyeri],
+            backgroundColor: 'rgba(var(--color-warning-rgb), 0.6)'
+        }, {
+            label: 'Skor Rata-rata Post-Test',
+            data: [avgPostScores.pengetahuan, avgPostScores.fungsiFisik, avgPostScores.hambatanNyeri],
+            backgroundColor: 'rgba(var(--color-success-rgb), 0.7)'
+        }]
+    }, {
+        scales: { y: { beginAtZero: true, suggestedMax: Math.max(...questionDomains.pengetahuan.map(d => d.length)) } }
     });
 
-    // 6. Tulis Interpretasi yang Disesuaikan dengan Laporan Anda
+    // Tulis Interpretasi
     const interpretationContainer = document.getElementById('questionnaire-interpretation');
     interpretationContainer.innerHTML = `
         <h4>Interpretasi Analisis Efektivitas Edukasi</h4>
@@ -1133,6 +1126,10 @@ function renderQuestionnaireAnalysis(data) {
         </ul>
         <p><strong>Kesimpulan:</strong> Data secara komprehensif menunjukkan bahwa optimalisasi tindakan keperawatan melalui media edukasi yang disediakan berhasil tidak hanya dalam mentransfer pengetahuan, tetapi juga secara positif mengubah persepsi pasien terhadap kemampuan fisik dan hambatan mereka, yang merupakan fondasi utama keberhasilan mobilisasi dini pasca-operasi.</p>
     `;
+
+    if (window.renderIndividualQuestionnaireAnalysis) {
+        renderIndividualQuestionnaireAnalysis(data);
+    }
 }
 
 function renderPatientDashboardAnalysis(data) {

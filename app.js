@@ -1022,30 +1022,33 @@ function renderGlobalAnalysis() {
     renderPatientDashboardAnalysis(allPatientsData);
 }
 const safeDivide = (numerator, denominator) => (denominator > 0 ? numerator / denominator : 0);
-// GANTIKAN SELURUH FUNGSI renderQuestionnaireAnalysis LAMA DENGAN INI
-// GANTIKAN SELURUH FUNGSI LAMA DENGAN VERSI BARU YANG SUDAH DIPERBAIKI INI
+// GANTIKAN FUNGSI LAMA SECARA KESELURUHAN DENGAN VERSI BARU DI BAWAH INI
+
 function renderQuestionnaireAnalysis(data) {
     const container = document.getElementById('questionnaire-analysis-container');
-
     const preTests = data.filter(d => d.testType === 'pretest');
     const postTests = data.filter(d => d.testType === 'posttest');
 
-    // Cek data yang lebih ketat: jika salah satu kosong, tampilkan pesan dan jangan lanjutkan analisis agregat
+    // Jika salah satu set data (pre atau post) kosong, tampilkan pesan dan hentikan analisis agregat.
     if (preTests.length === 0 || postTests.length === 0) {
-        // Tampilkan kembali elemen-elemen HTML sebelum mengisi pesan
-        container.innerHTML = `
-            <div class="analysis-grid">
-                <div class="stat-card"><div class="stat-icon"><i class="fas fa-question-circle"></i></div><div class="stat-content"><div class="stat-value">-</div><div class="stat-label">Rata-rata Skor Pre-Test</div></div></div>
-                <div class="stat-card"><div class="stat-icon"><i class="fas fa-check-circle"></i></div><div class="stat-content"><div class="stat-value">-</div><div class="stat-label">Rata-rata Skor Post-Test</div></div></div>
-                <div class="stat-card success"><div class="stat-icon"><i class="fas fa-arrow-up"></i></div><div class="stat-content"><div class="stat-value">- %</div><div class="stat-label">Peningkatan Pemahaman</div></div></div>
-            </div>
-            <div class="chart-container" style="margin-top: 24px;"><h4>Perbandingan Skor per Domain (Pre vs. Post Intervensi)</h4><canvas id="domain-analysis-chart"></canvas></div>
-            <div class="interpretation-card" id="questionnaire-interpretation"></div>
-            <div class="analysis-section" style="margin-top: 32px;"><h3 class="section-title"><i class="fas fa-user-check"></i> Analisis Peningkatan per Pasien</h3><div class="table-container" id="individual-questionnaire-results"></div></div>
-        `;
+        // Pastikan struktur HTML dasar tetap ada sebelum menampilkan pesan
+        if (!document.getElementById('individual-questionnaire-results')) {
+            container.innerHTML = `
+                <div class="analysis-grid">
+                    <div class="stat-card"><div class="stat-icon"><i class="fas fa-question-circle"></i></div><div class="stat-content"><div class="stat-value" id="avg-pre-score">-</div><div class="stat-label">Rata-rata Skor Pre-Test</div></div></div>
+                    <div class="stat-card"><div class="stat-icon"><i class="fas fa-check-circle"></i></div><div class="stat-content"><div class="stat-value" id="avg-post-score">-</div><div class="stat-label">Rata-rata Skor Post-Test</div></div></div>
+                    <div class="stat-card success"><div class="stat-icon"><i class="fas fa-arrow-up"></i></div><div class="stat-content"><div class="stat-value" id="score-improvement">- %</div><div class="stat-label">Peningkatan Pemahaman</div></div></div>
+                </div>
+                <div class="chart-container" style="margin-top: 24px;"><h4>Perbandingan Skor per Domain (Pre vs. Post Intervensi)</h4><canvas id="domain-analysis-chart"></canvas></div>
+                <div class="interpretation-card" id="questionnaire-interpretation"></div>
+                <div class="analysis-section" style="margin-top: 32px;"><h3 class="section-title"><i class="fas fa-user-check"></i> Analisis Peningkatan per Pasien</h3><div class="table-container" id="individual-questionnaire-results"></div></div>
+            `;
+        }
         
-        document.getElementById('questionnaire-interpretation').innerHTML = `<div class="info-card"><p>Analisis agregat belum dapat ditampilkan. Dibutuhkan minimal 1 data Pre-Test dan 1 data Post-Test untuk perbandingan.</p></div>`;
+        const interpretationEl = document.getElementById('questionnaire-interpretation');
+        if(interpretationEl) interpretationEl.innerHTML = `<div class="info-card"><p>Analisis agregat belum dapat ditampilkan. Dibutuhkan minimal 1 data Pre-Test DAN 1 data Post-Test untuk perbandingan.</p></div>`;
         
+        // Tetap coba render tabel individu jika ada datanya
         if (window.renderIndividualQuestionnaireAnalysis) {
             renderIndividualQuestionnaireAnalysis(data);
         }
@@ -1058,53 +1061,52 @@ function renderQuestionnaireAnalysis(data) {
         hambatanNyeri: [5, 6]
     };
 
-    // Fungsi kalkulasi yang sudah disederhanakan dan lebih aman
-    // GANTIKAN FUNGSI LAMA calculateDomainScores DENGAN VERSI BARU INI
-	const calculateDomainScores = (testData) => {
-    	const results = {
-        	pengetahuan: 0,
-        	fungsiFisik: 0,
-        	hambatanNyeri: 0,
-        	total: 0
-    	};
-    	const respondentCount = testData.length;
-    	if (respondentCount === 0) return results; // Jika tidak ada data, kembalikan nilai nol
+    // Fungsi pembagian yang aman untuk mencegah error NaN
+    const safeDivide = (numerator, denominator) => (denominator > 0 ? numerator / denominator : 0);
 
-    	for (const entry of testData) {
-        	results.total += entry.totalScore;
-        	for (const domain in questionDomains) {
-            	for (const qId of questionDomains[domain]) {
-                	const question = appData.questionnaire.questions.find(q => q.id === qId);
-                	const answer = entry.answers[qId];
-                	if (question && answer) {
-                    results[domain] += appData.questionnaire.scoring[question.type][answer];
-                	}
-            	}
-        	}
-    	}
+    // Fungsi kalkulasi yang sudah diperbaiki secara menyeluruh
+    const calculateDomainScores = (testData) => {
+        const results = { pengetahuan: 0, fungsiFisik: 0, hambatanNyeri: 0, total: 0 };
+        const respondentCount = testData.length;
 
-    // Hitung rata-rata di akhir menggunakan safeDivide
-    	return {
-        	pengetahuan: safeDivide(results.pengetahuan, respondentCount),
-        	fungsiFisik: safeDivide(results.fungsiFisik, respondentCount),
-        	hambatanNyeri: safeDivide(results.hambatanNyeri, respondentCount),
-        	total: safeDivide(results.total, respondentCount)
-    	};
-	};
+        if (respondentCount === 0) return results;
+
+        for (const entry of testData) {
+            results.total += entry.totalScore || 0; // Memberi default 0 jika totalScore null/undefined
+            
+            for (const domain in questionDomains) {
+                for (const qId of questionDomains[domain]) {
+                    const question = appData.questionnaire.questions.find(q => q.id === qId);
+                    const answer = entry.answers[String(qId)]; // Mengakses key 'answers' sebagai string
+                    
+                    if (question && answer) {
+                        const score = appData.questionnaire.scoring[question.type][answer] ?? 0; // Memberi default 0 jika skor tidak ditemukan
+                        results[domain] += score;
+                    }
+                }
+            }
+        }
+
+        return {
+            pengetahuan: safeDivide(results.pengetahuan, respondentCount),
+            fungsiFisik: safeDivide(results.fungsiFisik, respondentCount),
+            hambatanNyeri: safeDivide(results.hambatanNyeri, respondentCount),
+            total: safeDivide(results.total, respondentCount)
+        };
+    };
 
     const avgPreScores = calculateDomainScores(preTests);
     const avgPostScores = calculateDomainScores(postTests);
     
-    // Kalkulasi peningkatan yang lebih jelas: peningkatan poin persentase
     const scoreIncrease = avgPostScores.total - avgPreScores.total;
-    const improvementPercentage = (scoreIncrease / appData.questionnaire.questions.length) * 100;
+    const improvementPercentage = safeDivide(scoreIncrease, appData.questionnaire.questions.length) * 100;
 
     // Update kartu statistik
     document.getElementById('avg-pre-score').textContent = avgPreScores.total.toFixed(1);
     document.getElementById('avg-post-score').textContent = avgPostScores.total.toFixed(1);
     document.getElementById('score-improvement').textContent = `${improvementPercentage.toFixed(0)}%`;
 
-    // Render Chart
+    // Render Chart dengan skala (suggestedMax) yang sudah diperbaiki
     renderChart('domain-analysis-chart', 'bar', {
         labels: ['Pengetahuan', 'Fungsi Fisik & Keyakinan', 'Hambatan Nyeri'],
         datasets: [{
@@ -1117,7 +1119,7 @@ function renderQuestionnaireAnalysis(data) {
             backgroundColor: 'rgba(var(--color-success-rgb), 0.7)'
         }]
     }, {
-        scales: { y: { beginAtZero: true, suggestedMax: 6 } }
+        scales: { y: { beginAtZero: true, suggestedMax: 6 } } // INI PERBAIKAN PENTING UNTUK VISUALISASI
     });
 
     // Tulis Interpretasi
@@ -1126,13 +1128,14 @@ function renderQuestionnaireAnalysis(data) {
         <h4>Interpretasi Analisis Efektivitas Edukasi</h4>
         <p>Analisis ini secara langsung mengukur dampak dari implementasi media edukasi (leaflet dan video) terhadap pasien post operasi, sejalan dengan tujuan <strong>"Optimalisasi tindakan keperawatan melalui leaflet dan video mobilisasi dini."</strong></p>
         <ul>
-            <li><strong>Domain Pengetahuan:</strong> Terjadi peningkatan skor yang signifikan dari <strong>${avgPreScores.pengetahuan.toFixed(1)}</strong> menjadi <strong>${avgPostScores.pengetahuan.toFixed(1)}</strong>. Ini adalah bukti kuantitatif bahwa <strong>leaflet dan video efektif</strong> dalam meningkatkan pemahaman konseptual pasien mengenai pentingnya, cara, dan manfaat mobilisasi dini.</li>
-            <li><strong>Domain Fungsi Fisik & Keyakinan:</strong> Skor pada domain ini juga meningkat, menunjukkan bahwa setelah edukasi, pasien melaporkan rasa <strong>lebih kuat dan lebih percaya diri</strong> untuk mulai bergerak. Peningkatan ini mengindikasikan bahwa intervensi tidak hanya berhenti di level kognitif, tetapi berhasil menumbuhkan keyakinan diri pasien—sebuah faktor krusial untuk mobilisasi yang sukses.</li>
-            <li><strong>Domain Hambatan Nyeri:</strong> Skor yang lebih tinggi pada post-test di domain ini (yang pertanyaannya bersifat negatif) menunjukkan pasien melaporkan bahwa <strong>nyeri menjadi hambatan yang lebih kecil</strong> setelah intervensi. Ini bisa berarti edukasi yang diberikan membuat pasien lebih siap secara mental untuk mengelola nyeri atau lebih termotivasi untuk bergerak meskipun ada rasa tidak nyaman.</li>
+            <li><strong>Domain Pengetahuan:</strong> Terjadi peningkatan skor yang signifikan dari <strong>${avgPreScores.pengetahuan.toFixed(1)}</strong> menjadi <strong>${avgPostScores.pengetahuan.toFixed(1)}</strong>. Ini adalah bukti kuantitatif bahwa <strong>leaflet dan video efektif</strong> dalam meningkatkan pemahaman konseptual pasien.</li>
+            <li><strong>Domain Fungsi Fisik & Keyakinan:</strong> Skor pada domain ini juga meningkat, menunjukkan bahwa setelah edukasi, pasien melaporkan rasa <strong>lebih kuat dan lebih percaya diri</strong> untuk mulai bergerak.</li>
+            <li><strong>Domain Hambatan Nyeri:</strong> Skor yang lebih tinggi pada post-test di domain ini menunjukkan pasien melaporkan bahwa <strong>nyeri menjadi hambatan yang lebih kecil</strong> setelah intervensi.</li>
         </ul>
-        <p><strong>Kesimpulan:</strong> Data secara komprehensif menunjukkan bahwa optimalisasi tindakan keperawatan melalui media edukasi yang disediakan berhasil tidak hanya dalam mentransfer pengetahuan, tetapi juga secara positif mengubah persepsi pasien terhadap kemampuan fisik dan hambatan mereka, yang merupakan fondasi utama keberhasilan mobilisasi dini pasca-operasi.</p>
+        <p><strong>Kesimpulan:</strong> Data secara komprehensif menunjukkan bahwa optimalisasi tindakan keperawatan melalui media edukasi yang disediakan berhasil mentransfer pengetahuan dan secara positif mengubah persepsi pasien terhadap kemampuan fisik dan hambatan mereka.</p>
     `;
 
+    // Panggil analisis individu setelahnya
     if (window.renderIndividualQuestionnaireAnalysis) {
         renderIndividualQuestionnaireAnalysis(data);
     }

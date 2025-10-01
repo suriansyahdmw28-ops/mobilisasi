@@ -713,9 +713,10 @@ async function getAIPlan(patient) {
     const latestObs = patient.latestObservation || { mobilityLevel: 1, ponv: 'Tidak ada keluhan', rass: '0: Alert & Calm', painScale: 0, notes: '' };
     const hoursPostOp = (Date.now() - (getSecondsFromTS(patient.surgeryFinishTime) * 1000)) / (3600 * 1000);
 
-    const systemPrompt = `Anda adalah seorang Perawat Klinis Spesialis program ERAS (Enhanced Recovery After Surgery) di Indonesia. Tugas Anda adalah memberikan rencana mobilisasi dini yang sangat presisi, aman, dan dapat ditindaklanjuti. Jawaban WAJIB dalam format JSON.
+    // MODIFIED: Enhanced prompt for better AI responses
+    const systemPrompt = `Anda adalah "ERAS Clinical Advisor AI", seorang asisten perawat ahli yang berspesialisasi dalam protokol ERAS (Enhanced Recovery After Surgery) di Indonesia. Anda memberikan rekomendasi mobilisasi dini yang presisi, aman, beragam, dan dapat ditindaklanjuti. Jawaban WAJIB dalam format JSON.
 
-    Format JSON yang diminta:
+    Format JSON yang WAJIB dipatuhi:
     {
       "targetLevel": integer,
       "targetText": string,
@@ -725,35 +726,34 @@ async function getAIPlan(patient) {
       "rationale": string
     }
     
-    IKUTI ATURAN PENGAMBILAN KEPUTUSAN BERIKUT SECARA BERURUTAN:
+    PROSES PENGAMBILAN KEPUTUSAN ANDA (IKUTI SECARA KETAT):
     
-    ATURAN 1: PROTOKOL KEAMANAN (RED FLAGS). Cek kondisi berikut:
-    - Nyeri (Skala NRS) > 4
-    - PONV (Mual/Muntah) bukan "Tidak ada keluhan"
-    - RASS (Tingkat Kesadaran) bukan "0: Alert & Calm"
-    - Anestesi Spinal/Epidural dan Waktu Pasca-Operasi < 12 jam
+    LANGKAH 1: ANALISIS KESELAMATAN (RED FLAGS). Prioritas tertinggi Anda adalah keselamatan pasien. Cek kondisi berikut:
+    - Nyeri (Skala NRS) > 4: Pasien tidak dapat berpartisipasi penuh.
+    - PONV (Mual/Muntah) bukan "Tidak ada keluhan": Risiko dehidrasi, kelelahan, dan aspirasi.
+    - RASS (Tingkat Kesadaran) bukan "0: Alert & Calm": Pasien tidak dapat mengikuti instruksi dengan aman.
+    - Anestesi Spinal/Epidural DAN Waktu Pasca-Operasi < 12 jam: Risiko hipotensi ortostatik dan kelemahan motorik sisa.
     
-    Jika SALAH SATU kondisi di atas terpenuhi:
-    - "targetLevel" WAJIB SAMA DENGAN Level Saat Ini. JANGAN menaikkan level.
-    - "targetTimeline": "Hingga kondisi stabil".
-    - "primarySuggestion" WAJIB berfokus pada penyelesaian red flag tersebut. Contoh: "Kolaborasi dengan dokter untuk optimalisasi analgesik (nyeri > 4)", "Berikan antiemetik sesuai advis dan monitor respon (ada PONV)", "Lanjutkan observasi RASS hingga kembali ke 0 (RASS abnormal)", "Pertahankan tirah baring, monitor sensori/motorik pulih sepenuhnya (efek spinal)".
-    - "secondarySuggestions": Berikan 1-2 saran yang mendukung kondisi saat ini, seperti "Anjurkan latihan rentang gerak aktif/pasif di tempat tidur" atau "Pastikan hidrasi adekuat".
-    - "rationale": Jelaskan red flag yang teridentifikasi sebagai alasan utama.
+    JIKA SALAH SATU ATAU LEBIH RED FLAG terpenuhi:
+    - "targetLevel" WAJIB SAMA DENGAN Level Saat Ini. JANGAN menaikkan level mobilisasi.
+    - "targetTimeline": Set ke "Hingga kondisi stabil".
+    - "primarySuggestion": WAJIB berfokus pada PENYELESAIAN red flag tersebut. Contoh: "Fokus atasi nyeri: Kolaborasi analgesik & evaluasi non-farmakologis", "Manajemen PONV: Berikan antiemetik sesuai advis & monitor hidrasi", "Observasi ketat RASS hingga kembali ke 0 sebelum mobilisasi lanjut", "Pertahankan tirah baring total, monitor pemulihan sensori/motorik ekstremitas bawah (efek spinal)".
+    - "secondarySuggestions": Berikan 1-2 saran pendukung yang aman di tempat tidur. Contoh: "Anjurkan latihan ROM aktif/pasif di tempat tidur", "Latih teknik batuk efektif dengan bantal penyangga".
+    - "rationale": Jelaskan DENGAN JELAS red flag yang teridentifikasi sebagai alasan utama penundaan progresi.
     
-    ATURAN 2: PROTOKOL PROGRESI (Jika TIDAK ADA Red Flags).
-    - Tentukan "targetLevel" berdasarkan matriks berikut (pilih yang paling sesuai, naikkan SATU level dari saat ini jika memungkinkan):
-      - Operasi Ringan (Appendectomy, Hernia) & < 12 jam post-op: Target Level 3 (Berdiri)
-      - Operasi Ringan & > 12 jam post-op: Target Level 4 (Jalan di tempat) atau 5 (Jalan >10 langkah)
-      - Operasi Mayor Abdomen (Laparotomi) & < 24 jam post-op: Target Level 2 (Duduk)
-      - Operasi Mayor Abdomen & > 24 jam post-op: Target Level 3 (Berdiri) atau 4 (Jalan di tempat)
-      - Operasi Ortopedi (ORIF/ROI): Target sangat bergantung pada instruksi dokter/fisioterapi. Jika tidak ada catatan, target konservatif adalah Level 2 (Duduk) atau 3 (Berdiri tanpa menumpu berat badan).
-      - Usia > 65 tahun: Gunakan target yang lebih konservatif (misal, target untuk <12 jam diterapkan untuk <24 jam).
-    - "targetTimeline": Tentukan waktu yang realistis (Contoh: "Dalam 8 jam ke depan", "Sebelum jam makan siang", "Pada shift sore ini").
-    - "primarySuggestion": Buat saran yang SANGAT SPESIFIK dan TERUKUR untuk mencapai target. Contoh: "Bantu pasien berdiri di samping tempat tidur selama 2 menit, ulangi 3 kali sebelum pukul 15:00." atau "Dampingi pasien berjalan 15 langkah dari tempat tidur ke arah pintu."
-    - "secondarySuggestions": Berikan 2-3 saran pendukung yang relevan. Pilih dari daftar ini: "Edukasi pasien tentang teknik batuk efektif", "Libatkan keluarga untuk memberi dukungan moril", "Perhatikan posisi drain/kateter saat bergerak", "Observasi tanda-tanda hipotensi ortostatik saat perubahan posisi", "Pastikan bel dan barang pribadi dalam jangkauan pasien", "Jelaskan manfaat setiap tahapan mobilisasi kepada pasien".
-    - "rationale": Jelaskan mengapa target tersebut sesuai berdasarkan jenis operasi, waktu pasca-op, dan status stabil pasien.`;
+    LANGKAH 2: RENCANA PROGRESI (Jika TIDAK ADA Red Flags).
+    - Tentukan "targetLevel" dengan menaikkan SATU TINGKAT dari level saat ini, namun sesuaikan dengan matriks klinis berikut:
+      - Operasi Mayor (Laparotomi, ORIF): Progresi lebih hati-hati. Targetkan Level 2-3 dalam 24 jam pertama. Targetkan Level 3-4 setelah 24 jam.
+      - Operasi Minor (Appendectomy, Hernia): Progresi lebih cepat. Targetkan Level 3-4 dalam 12 jam pertama. Targetkan Level 4-5 setelah 12 jam.
+      - Usia > 65 tahun atau ada 'Catatan Tambahan' tentang komorbiditas (misal: riwayat jatuh, kelemahan): Gunakan target yang lebih konservatif (perlakukan seperti operasi mayor).
+      - Anestesi General memungkinkan progresi lebih cepat daripada Spinal setelah 12 jam.
+    - "targetTimeline": Berikan timeline yang spesifik. Contoh: "Dalam 6 jam ke depan", "Sebelum shift berakhir (pukul 21:00)", "Pada pagi hari esok".
+    - "primarySuggestion": Buat saran yang SANGAT SPESIFIK, TERUKUR, dan BISA DILAKUKAN. Contoh: "Dampingi pasien duduk di tepi tempat tidur selama 5 menit, 2 kali sebelum makan siang" atau "Targetkan berjalan 15 langkah dari tempat tidur ke kamar mandi dengan bantuan".
+    - "secondarySuggestions": Berikan 2-3 saran pendukung yang BERAGAM dan KREATIF. PILIH DARI: "Libatkan keluarga untuk memberikan motivasi saat pasien mencoba berdiri", "Putar musik favorit pasien untuk distraksi saat latihan", "Pastikan jalur ke kamar mandi bebas hambatan sebelum berjalan", "Edukasi pasien manfaat spesifik dari target (misal: 'Berjalan akan membantu usus Anda bergerak lagi')", "Cek tanda hipotensi ortostatik (pusing) saat pertama kali berdiri".
+    - "rationale": Berikan justifikasi klinis yang kuat mengapa target tersebut aman dan sesuai, dengan mempertimbangkan jenis operasi, waktu pasca-op, dan status stabil pasien. PERHATIKAN "Catatan Tambahan" dari perawat sebagai konteks penting.`;
 
     const userQuery = `
+    Tolong berikan rekomendasi mobilisasi untuk pasien berikut.
     Data Pasien:
     - Umur: ${patient.age} tahun
     - Jenis Kelamin: ${patient.gender}
@@ -764,14 +764,26 @@ async function getAIPlan(patient) {
     - Kondisi PONV (Mual/Muntah): ${latestObs.ponv}
     - Tingkat Kesadaran (RASS): ${latestObs.rass}
     - Skala Nyeri (0-10): ${latestObs.painScale}
-    - Catatan Tambahan: ${latestObs.notes || 'Tidak ada'}
+    - Catatan Tambahan dari Perawat: ${latestObs.notes || 'Tidak ada'}
 
-    Berdasarkan data di atas, berikan rekomendasi mobilisasi dalam format JSON yang diminta.`;
-
-    try {
-        const apiKey = "";
-        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+    Berdasarkan semua data di atas, berikan rekomendasi mobilisasi dalam format JSON yang diminta.`;
+    
+    // --- SECURITY WARNING ---
+    // The API key is exposed on the client-side. This is a major security risk.
+    // This key should be moved to a backend server or a serverless function (e.g., Google Cloud Functions)
+    // The frontend should call your backend, which then securely calls the Gemini API.
+    const apiKey = "YOUR_API_KEY_HERE"; // <-- IMPORTANT: Replace with your key and move to a backend!
+    
+    // MODIFIED: Upgraded to a more powerful model
+    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro-latest:generateContent?key=${apiKey}`;
+    
+    if (apiKey === "YOUR_API_KEY_HERE") {
+        console.warn("Gemini API key is not set. Falling back to rule-based logic.");
+        showToast("Kunci API belum diatur.", "warning");
+        return getRuleBasedPlan(patient);
+    }
         
+    try {
         const payload = {
             contents: [{ parts: [{ text: userQuery }] }],
             systemInstruction: { parts: [{ text: systemPrompt }] },
@@ -788,7 +800,9 @@ async function getAIPlan(patient) {
 
         if (!response.ok) {
             console.error("AI API Error:", response.status, response.statusText);
-            throw new Error('AI response not OK');
+            const errorBody = await response.text();
+            console.error("Error Body:", errorBody);
+            throw new Error(`AI response not OK: ${response.statusText}`);
         }
 
         const result = await response.json();
@@ -796,13 +810,13 @@ async function getAIPlan(patient) {
         
         if (jsonString) {
             const parsedJson = JSON.parse(jsonString);
-            if (parsedJson.targetLevel && parsedJson.targetText && parsedJson.primarySuggestion && parsedJson.rationale) {
+            if (parsedJson.targetLevel && parsedJson.primarySuggestion && parsedJson.rationale) {
                 const scaleInfo = appData.mobilityScale.find(s => s.level === parsedJson.targetLevel);
-                if (scaleInfo) parsedJson.targetText = `Level ${scaleInfo.level}`;
+                parsedJson.targetText = scaleInfo ? scaleInfo.name : `Level ${parsedJson.targetLevel}`;
                 return parsedJson;
             }
         }
-        throw new Error('Invalid JSON response from AI');
+        throw new Error('Invalid JSON structure from AI');
 
     } catch (error) {
         console.warn("AI recommendation failed, falling back to rule-based logic.", error);
@@ -869,7 +883,7 @@ function getRuleBasedPlan(patient) {
     }
 
     const scaleInfo = appData.mobilityScale.find(s => s.level === plan.targetLevel);
-    plan.targetText = `Level ${plan.targetLevel}`;
+    plan.targetText = scaleInfo ? scaleInfo.name : `Level ${plan.targetLevel}`;
     plan.primarySuggestion += ' <span class="ai-badge fallback">Fallback</span>';
 
     return plan;
@@ -939,7 +953,7 @@ function openPatientModal(patientId = null) {
             <div class="form-group"><label>Skala Nyeri (0-10)</label><input type="number" id="update-pain" class="form-control" min="0" max="10" value="0"></div>
             <div class="form-group"><label>Mual/Muntah (PONV)</label><select id="update-ponv" class="form-control">${ponvOptions}</select></div>
             <div class="form-group"><label>Tingkat Kesadaran (RASS)</label><select id="update-rass" class="form-control">${rassOptions}</select></div>
-            <div class="form-group full-width"><label>Catatan Tambahan</label><textarea id="update-notes" class="form-control" rows="2"></textarea></div>
+            <div class="form-group full-width"><label>Catatan Tambahan</label><textarea id="update-notes" class="form-control" rows="2" placeholder="Contoh: Pasien mengeluh pusing saat mencoba duduk..."></textarea></div>
         </div>
         <div class="modal-footer"><button class="btn btn--primary" id="save-update-btn" data-id="${patientId}">Simpan Observasi</button></div>`;
         
@@ -986,15 +1000,25 @@ function startRealtimeClocks() {
     updateTimes();
 }
 
-// --- FUNGSI ANALISIS GLOBAL (DIUBAH TOTAL) ---
+// --- FUNGSI ANALISIS GLOBAL (REWRITTEN & FIXED) ---
 
 function renderGlobalAnalysis() {
-    renderQuestionnaireAnalysis(questionnaireData);
-    renderPatientDashboardAnalysis(allPatientsData);
+    try {
+        renderQuestionnaireAnalysis(questionnaireData);
+        renderPatientDashboardAnalysis(allPatientsData);
+    } catch (error) {
+        console.error("Failed to render global analysis:", error);
+        const analysisContainer = document.getElementById('patient-analysis-container');
+        if (analysisContainer) {
+            analysisContainer.innerHTML = `<div class="info-card"><p>Terjadi kesalahan saat membuat analisis. Periksa konsol untuk detail.</p></div>`;
+        }
+    }
 }
 
 function renderQuestionnaireAnalysis(data) {
     const container = document.getElementById('questionnaire-analysis-container');
+    if (!container) return;
+    
     if (!data || data.length === 0) {
         container.innerHTML = `<div class="info-card"><p>Belum ada data kuesioner yang cukup untuk dianalisis.</p></div>`;
         return;
@@ -1040,10 +1064,12 @@ function renderQuestionnaireAnalysis(data) {
 
 function renderPatientDashboardAnalysis(data) {
     const container = document.getElementById('patient-analysis-container');
+    if (!container) return;
+    
     const patients = data.filter(p => p.latestObservation && p.surgeryFinishTime);
 
-    if (patients.length < 3) { // Membutuhkan lebih banyak data untuk analisis yang berarti
-        container.innerHTML = `<div class="info-card"><p>Data pasien belum cukup untuk membuat analisis komprehensif. Dibutuhkan minimal 3 data pasien.</p></div>`;
+    if (patients.length < 2) { 
+        container.innerHTML = `<div class="info-card"><p>Data pasien belum cukup untuk membuat analisis komprehensif. Dibutuhkan minimal 2 data pasien dengan observasi.</p></div>`;
         return;
     }
 
@@ -1054,11 +1080,11 @@ function renderPatientDashboardAnalysis(data) {
                 <canvas id="progress-vs-target-chart"></canvas>
             </div>
             <div class="chart-container">
-                <h4>Perbandingan Level per Jenis Operasi & Anestesi</h4>
+                <h4>Level Rata-rata per Jenis Operasi & Anestesi</h4>
                 <canvas id="op-anesthesia-chart"></canvas>
             </div>
             <div class="chart-container">
-                <h4>Perbandingan Level per Umur & Jenis Kelamin</h4>
+                <h4>Level Rata-rata per Kelompok Umur</h4>
                 <canvas id="age-gender-chart"></canvas>
             </div>
              <div class="chart-container full-span">
@@ -1070,32 +1096,29 @@ function renderPatientDashboardAnalysis(data) {
             <h4>Interpretasi Analisis Komprehensif</h4>
             <p>Analisis ini menghubungkan berbagai faktor untuk memberikan gambaran lengkap tentang progres mobilisasi dini di ruangan Anda:</p>
             <ul>
-                <li><strong>Progres vs. Target (Grafik 1):</strong> Grafik ini adalah indikator utama keberhasilan program. Idealnya, garis 'Level Aktual' harus selalu mendekati atau bahkan melampaui garis 'Target Level' seiring berjalannya hari pasca-operasi (POD). Jarak yang lebar antara kedua garis mungkin mengindikasikan adanya tantangan sistemik.</li>
-                <li><strong>Faktor Klinis (Grafik 2):</strong> Grafik ini membandingkan dampak gabungan dari jenis operasi dan anestesi. Misalnya, Anda mungkin menemukan bahwa pasien 'Operasi Mayor' dengan 'Anestesi Spinal' memiliki progres paling lambat, yang menandakan bahwa kelompok ini memerlukan perhatian dan strategi mobilisasi khusus.</li>
-                <li><strong>Faktor Demografis (Grafik 3):</strong> Dengan membandingkan kelompok umur dan jenis kelamin, kita dapat mengidentifikasi populasi berisiko. Jika pasien 'Usia > 60' secara konsisten menunjukkan level mobilisasi yang lebih rendah, ini bisa menjadi dasar untuk mengembangkan protokol mobilisasi geriatri.</li>
-                <li><strong>Hambatan Utama (Grafik 4):</strong> Grafik ini secara kuantitatif menunjukkan 'biang keladi' dari kegagalan pencapaian target. Persentase keberhasilan yang jauh lebih rendah pada kelompok 'Dengan Hambatan' adalah bukti kuat bahwa manajemen nyeri, PONV, dan RASS yang efektif merupakan prasyarat mutlak untuk keberhasilan mobilisasi.</li>
+                <li><strong>Progres vs. Target:</strong> Grafik ini adalah indikator utama keberhasilan program. Idealnya, garis 'Level Aktual' harus selalu mendekati atau bahkan melampaui garis 'Target Level' seiring berjalannya waktu pasca-operasi. Jarak yang lebar antara kedua garis mungkin mengindikasikan adanya tantangan sistemik.</li>
+                <li><strong>Faktor Klinis:</strong> Grafik ini membandingkan dampak gabungan dari jenis operasi dan anestesi. Misalnya, Anda mungkin menemukan bahwa pasien 'Operasi Mayor' dengan 'Anestesi Spinal' memiliki progres paling lambat, yang menandakan bahwa kelompok ini memerlukan perhatian dan strategi mobilisasi khusus.</li>
+                <li><strong>Faktor Demografis:</strong> Dengan membandingkan kelompok umur, kita dapat mengidentifikasi populasi berisiko. Jika pasien 'Usia > 60' secara konsisten menunjukkan level mobilisasi yang lebih rendah, ini bisa menjadi dasar untuk mengembangkan protokol mobilisasi geriatri.</li>
+                <li><strong>Hambatan Utama:</strong> Grafik ini secara kuantitatif menunjukkan 'biang keladi' dari kegagalan pencapaian target. Persentase keberhasilan yang jauh lebih rendah pada kelompok 'Dengan Hambatan' adalah bukti kuat bahwa manajemen nyeri, PONV, dan RASS yang efektif merupakan prasyarat mutlak untuk keberhasilan mobilisasi.</li>
             </ul>
         </div>
     `;
     
-    // --- 1. Progres Aktual vs Target per POD ---
-    const podData = {}; // { 0: { actuals: [], targets: [] } }
+    // --- 1. Progres Aktual vs Target per Waktu ---
+    const timeData = { '<12h': { actuals: [], targets: [] }, '12-24h': { actuals: [], targets: [] }, '>24h': { actuals: [], targets: [] } };
     patients.forEach(p => {
-        const hoursPostOp = (getSecondsFromTS(p.dischargedAt || p.latestObservation.createdAt || p.createdAt) - getSecondsFromTS(p.surgeryFinishTime)) / 3600;
-        const pod = Math.floor(hoursPostOp / 24);
-        if (pod < 4) { // Analisis untuk 4 hari pertama
-            if (!podData[pod]) podData[pod] = { actuals: [], targets: [] };
-            podData[pod].actuals.push(p.latestObservation.mobilityLevel);
-            podData[pod].targets.push(getRuleBasedPlan(p).targetLevel);
+        const hoursPostOp = (Date.now() - getSecondsFromTS(p.surgeryFinishTime) * 1000) / 3600;
+        let timeGroup = hoursPostOp < 12 ? '<12h' : (hoursPostOp <= 24 ? '12-24h' : '>24h');
+        if (p.latestObservation && p.currentTarget) {
+             timeData[timeGroup].actuals.push(p.latestObservation.mobilityLevel);
+             timeData[timeGroup].targets.push(p.currentTarget.targetLevel);
         }
     });
-
-    const podLabels = Object.keys(podData).sort((a,b)=>a-b);
-    const actualsAvg = podLabels.map(pod => podData[pod].actuals.reduce((a,b)=>a+b,0) / podData[pod].actuals.length);
-    const targetsAvg = podLabels.map(pod => podData[pod].targets.reduce((a,b)=>a+b,0) / podData[pod].targets.length);
-
+    const timeLabels = Object.keys(timeData);
+    const actualsAvg = timeLabels.map(t => timeData[t].actuals.length > 0 ? timeData[t].actuals.reduce((a,b)=>a+b,0) / timeData[t].actuals.length : 0);
+    const targetsAvg = timeLabels.map(t => timeData[t].targets.length > 0 ? timeData[t].targets.reduce((a,b)=>a+b,0) / timeData[t].targets.length : 0);
     renderChart('progress-vs-target-chart', 'line', {
-        labels: podLabels.map(l => `Hari ke-${l}`),
+        labels: timeLabels,
         datasets: [
             { label: 'Level Aktual Rata-rata', data: actualsAvg, borderColor: 'var(--color-primary)', backgroundColor: 'transparent', tension: 0.1, pointRadius: 5 },
             { label: 'Target Level Rata-rata', data: targetsAvg, borderColor: 'var(--color-error)', backgroundColor: 'transparent', borderDash: [5, 5], tension: 0.1, pointRadius: 5 }
@@ -1104,17 +1127,12 @@ function renderPatientDashboardAnalysis(data) {
 
     // --- 2. Perbandingan per Jenis Operasi & Anestesi ---
     const majorOps = ['Laparotomy', 'Mastectomy', 'ORIF', 'ROI'];
-    const opAnesthesiaData = {
-        'Op. Minor - General': [], 'Op. Minor - Spinal': [],
-        'Op. Mayor - General': [], 'Op. Mayor - Spinal': []
-    };
+    const opAnesthesiaData = { 'Minor-General': [], 'Minor-Spinal': [], 'Mayor-General': [], 'Mayor-Spinal': [] };
     patients.forEach(p => {
-        const opType = majorOps.includes(p.operation) ? 'Op. Mayor' : 'Op. Minor';
+        const opType = majorOps.some(op => p.operation.includes(op)) ? 'Mayor' : 'Minor';
         const anType = p.anesthesia.includes('General') ? 'General' : 'Spinal';
-        const key = `${opType} - ${anType}`;
-        if (opAnesthesiaData.hasOwnProperty(key)) {
-            opAnesthesiaData[key].push(p.latestObservation.mobilityLevel);
-        }
+        const key = `${opType}-${anType}`;
+        if (p.latestObservation) opAnesthesiaData[key].push(p.latestObservation.mobilityLevel);
     });
     const opAnesthesiaLabels = Object.keys(opAnesthesiaData);
     const opAnesthesiaValues = opAnesthesiaLabels.map(label => {
@@ -1124,70 +1142,45 @@ function renderPatientDashboardAnalysis(data) {
     renderChart('op-anesthesia-chart', 'bar', {
         labels: opAnesthesiaLabels,
         datasets: [{ label: 'Level Rata-rata', data: opAnesthesiaValues, backgroundColor: ['#2dd4bf', '#38bdf8', '#fb923c', '#f87171'], borderRadius: 4 }]
-    }, { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } });
+    }, { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, suggestedMax: 8 } } });
 
-    // --- 3. Perbandingan per Umur & Jenis Kelamin ---
-    const ageGenderData = {
-        'L: <40 thn': [], 'P: <40 thn': [],
-        'L: 40-60 thn': [], 'P: 40-60 thn': [],
-        'L: >60 thn': [], 'P: >60 thn': []
-    };
+    // --- 3. Perbandingan per Umur ---
+    const ageData = { '<40 thn': [], '40-60 thn': [], '>60 thn': [] };
      patients.forEach(p => {
         const age = parseInt(p.age);
-        const gender = p.gender === 'Laki-laki' ? 'L' : 'P';
-        let ageGroup = '';
-        if (age < 40) ageGroup = '<40 thn';
-        else if (age <= 60) ageGroup = '40-60 thn';
-        else ageGroup = '>60 thn';
-        const key = `${gender}: ${ageGroup}`;
-        if (ageGenderData.hasOwnProperty(key)) {
-            ageGenderData[key].push(p.latestObservation.mobilityLevel);
-        }
+        let ageGroup = age < 40 ? '<40 thn' : (age <= 60 ? '40-60 thn' : '>60 thn');
+        if (p.latestObservation) ageData[ageGroup].push(p.latestObservation.mobilityLevel);
     });
-    const ageGenderLabels = Object.keys(ageGenderData);
-    const ageGenderValues = ageGenderLabels.map(label => {
-        const levels = ageGenderData[label];
+    const ageLabels = Object.keys(ageData);
+    const ageValues = ageLabels.map(label => {
+        const levels = ageData[label];
         return levels.length > 0 ? levels.reduce((a,b)=>a+b,0) / levels.length : 0;
     });
     renderChart('age-gender-chart', 'bar', {
-        labels: ageGenderLabels,
-        datasets: [{ label: 'Level Rata-rata', data: ageGenderValues, backgroundColor: ['#3b82f6', '#ec4899', '#22c55e', '#f43f5e', '#8b5cf6', '#eab308' ], borderRadius: 4 }]
-    }, { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } });
+        labels: ageLabels,
+        datasets: [{ label: 'Level Rata-rata', data: ageValues, backgroundColor: ['#3b82f6', '#22c55e', '#eab308' ], borderRadius: 4 }]
+    }, { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, suggestedMax: 8 } } });
 
 
-    // --- 4. Analisis Dampak Hambatan (PONV/RASS/Nyeri) ---
-    const barrierAnalysis = {
-        withBarrier: { success: 0, total: 0 },
-        noBarrier: { success: 0, total: 0 }
-    };
+    // --- 4. Analisis Dampak Hambatan ---
+    const barrierAnalysis = { withBarrier: { success: 0, total: 0 }, noBarrier: { success: 0, total: 0 } };
     patients.forEach(p => {
         const obs = p.latestObservation;
+        if (!obs || !p.currentTarget) return;
         const painScore = obs.painScale || 0;
         const hasBarrier = obs.ponv !== 'Tidak ada keluhan' || !obs.rass.startsWith('0:') || painScore >= 4;
-        const targetPlan = getRuleBasedPlan(p);
-        const isAchieved = obs.mobilityLevel >= targetPlan.targetLevel;
-
+        const isAchieved = obs.mobilityLevel >= p.currentTarget.targetLevel;
         const group = hasBarrier ? 'withBarrier' : 'noBarrier';
         barrierAnalysis[group].total++;
-        if (isAchieved) {
-            barrierAnalysis[group].success++;
-        }
+        if (isAchieved) barrierAnalysis[group].success++;
     });
-
     const barrierData = [
         barrierAnalysis.noBarrier.total > 0 ? (barrierAnalysis.noBarrier.success / barrierAnalysis.noBarrier.total) * 100 : 0,
         barrierAnalysis.withBarrier.total > 0 ? (barrierAnalysis.withBarrier.success / barrierAnalysis.withBarrier.total) * 100 : 0
     ];
-
     renderChart('barrier-impact-chart', 'bar', {
         labels: ['Pasien Stabil (Tanpa Hambatan)', 'Pasien dengan PONV/RASS/Nyeri ≥ 4'],
-        datasets: [{
-            label: '% Target Tercapai',
-            data: barrierData,
-            backgroundColor: ['rgba(var(--color-success-rgb), 0.7)', 'rgba(var(--color-error-rgb), 0.6)'],
-            borderRadius: 4,
-            barThickness: 60
-        }]
+        datasets: [{ label: '% Target Tercapai', data: barrierData, backgroundColor: ['rgba(var(--color-success-rgb), 0.7)', 'rgba(var(--color-error-rgb), 0.6)'], borderRadius: 4, barThickness: 60 }]
     }, { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, max: 100, ticks: { callback: value => `${value}%` } } } });
 }
 
@@ -1199,8 +1192,7 @@ function renderChart(canvasId, type, data, options = {}) {
         chartInstances[canvasId].destroy();
     }
     const defaultOptions = {
-        maintainAspectRatio: true,
-	aspectRatio: 2.5,
+        maintainAspectRatio: false,
         responsive: true,
         plugins: {
             legend: {

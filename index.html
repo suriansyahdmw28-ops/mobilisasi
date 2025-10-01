@@ -58,7 +58,7 @@
             <div id="leaflet-page" class="page">
                 <div class="page-header"><h2>Leaflet Digital - Mobilisasi Dini</h2><a href="leaflet.pdf" download="Leaflet-Mobilisasi-Dini.pdf" class="btn btn--primary btn--sm"><i class="fas fa-download"></i> Download PDF</a></div>
                 <div class="pdf-viewer-container">
-                    <iframe src="leaflet.pdf"></iframe>
+                    <iframe src="leaflet.pdf" title="Leaflet Mobilisasi Dini"></iframe>
                 </div>
             </div>
             
@@ -107,11 +107,11 @@
                              <div class="results-content">
                                  <div class="score-display">
                                      <div class="score-number" id="score-display">0</div>
-                                     <div class="score-total">dari 20</div>
+                                     <div class="score-total" id="score-total"></div>
                                  </div>
                                  <div class="interpretation" id="interpretation"></div>
                                  <div class="results-actions">
-                                     <button class="btn btn--outline retry-btn"><i class="fas fa-redo"></i> Isi Ulang Kuesioner</button>
+                                     <button class="btn btn--secondary retry-btn"><i class="fas fa-redo"></i> Isi Ulang Kuesioner</button>
                                  </div>
                              </div>
                          </div>
@@ -153,9 +153,9 @@
                                 <th>Operasi</th>
                                 <th>Anestesi</th>
                                 <th>Jam Post-OP</th>
-                                <th>PONV / RASS / Nyeri</th>
+                                <th>Status Klinis</th>
                                 <th>Mobilisasi Sekarang</th>
-                                <th>Target Mobilisasi</th>
+                                <th>Target</th>
                                 <th>Saran / Aksi</th>
                             </tr>
                         </thead>
@@ -213,8 +213,8 @@
                 <p>Masukkan ID unik untuk klinik atau ruangan Anda untuk menyimpan dan menyinkronkan data pasien.</p>
                 <p><small><strong>Penting:</strong> Gunakan ID yang sama setiap kali Anda membuka aplikasi ini di perangkat baru atau setelah membersihkan cache.</small></p>
                 <div class="form-group" style="margin-top: 16px;">
-                    <label for="clinic-id-input" class="form-label">Tulis dibawah: bedah</label>
-                    <input type="text" id="clinic-id-input" class="form-control" placeholder="Masukkan ID unik Anda di sini...">
+                    <label for="clinic-id-input" class="form-label">Tulis ID unik Anda:</label>
+                    <input type="text" id="clinic-id-input" class="form-control" placeholder="Contoh: RUANG-BEDAH-PJS">
                 </div>
             </div>
             <div class="modal-footer">
@@ -227,7 +227,19 @@
         <div class="toast-content"><i class="toast-icon"></i><span class="toast-message"></span></div>
     </div>
 
+    <!-- Gunakan __firebase_config dan variabel global lain yang disediakan oleh environment -->
+    <script>
+      // Variabel ini akan digantikan oleh environment production secara otomatis
+      // JANGAN MENGUBAH NAMA VARIABEL INI
+      var __firebase_config = `{
+        "apiKey": "YOUR_API_KEY",
+        "authDomain": "YOUR_AUTH_DOMAIN",
+        "projectId": "YOUR_PROJECT_ID",
+        "storageBucket": "YOUR_STORAGE_BUCKET",
+        "messagingSenderId": "YOUR_MESSAGING_SENDER_ID",
+        "appId": "YOUR_APP_ID"
+      }`;
+    </script>
     <script type="module" src="app.js"></script>
 </body>
 </html>
-

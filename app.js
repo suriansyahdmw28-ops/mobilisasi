@@ -198,7 +198,9 @@ function listenForPatientUpdates() {
 
 		// 'allPatientsData' yang berisi SEMUA pasien (aktif dan diarsipkan) akan digunakan untuk analisis
 		await renderPatientTable(activePatients);
-
+		if(document.getElementById('analysis-page').classList.contains('active')){
+        	renderGlobalAnalysis();
+		}
     }, error => {
         console.error("Error listening to patient updates:", error);
         showToast("Gagal memuat data pasien.", "error");
@@ -212,6 +214,9 @@ function listenForQuestionnaireUpdates() {
     const q = query(collection(db, collectionPath));
     onSnapshot(q, snapshot => {
         questionnaireData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+		if(document.getElementById('analysis-page').classList.contains('active')){
+        	renderGlobalAnalysis();
+    	}
     }, error => {
         console.error("Error listening to questionnaire updates:", error);
         showToast("Gagal memuat data kuesioner.", "error");
@@ -1111,7 +1116,7 @@ function renderQuestionnaireAnalysis(data) {
             backgroundColor: 'rgba(var(--color-success-rgb), 0.7)'
         }]
     }, {
-        scales: { y: { beginAtZero: true, suggestedMax: Math.max(...questionDomains.pengetahuan.map(d => d.length)) } }
+        scales: { y: { beginAtZero: true, suggestedMax: 6 } }
     });
 
     // Tulis Interpretasi

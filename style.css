@@ -173,7 +173,7 @@ p:last-child { margin-bottom: 0; }
 .mobility-level-item p { font-size: var(--font-size-sm); line-height: 1.4; margin-bottom: 0; }
 .mobility-level-item p strong { color: var(--color-text); }
 .table-container { overflow-x: auto; background: var(--color-surface); border-radius: var(--radius-lg); border: 1px solid var(--color-card-border); margin-top: var(--space-24); }
-.patient-table { width: 100%; border-collapse: collapse; }
+.patient-table { width: 98%; border-collapse: collapse; }
 
 .patient-table th, .patient-table td {
     padding: var(--space-12);
@@ -187,16 +187,16 @@ p:last-child { margin-bottom: 0; }
     font-size: var(--font-size-sm);
 }
 
-/* Penyesuaian lebar kolom agar muat di layar */
-.patient-table th:nth-child(1), .patient-table td:nth-child(1) { width: 14%; min-width: 150px; } /* Pasien */
-.patient-table th:nth-child(2), .patient-table td:nth-child(2) { width: 7%; min-width: 70px; }  /* Umur / JK */
-.patient-table th:nth-child(3), .patient-table td:nth-child(3) { width: 10%; min-width: 100px; } /* Operasi */
-.patient-table th:nth-child(4), .patient-table td:nth-child(4) { width: 10%; min-width: 110px; } /* Anestesi */
+/* Penyesuaian lebar kolom agar lebih responsif */
+.patient-table th:nth-child(1), .patient-table td:nth-child(1) { width: 15%; min-width: 140px; } /* Pasien */
+.patient-table th:nth-child(2), .patient-table td:nth-child(2) { width: 5%; min-width: 60px; }  /* Umur / JK */
+.patient-table th:nth-child(3), .patient-table td:nth-child(3) { width: 10%; min-width: 90px; } /* Operasi */
+.patient-table th:nth-child(4), .patient-table td:nth-child(4) { width: 10%; min-width: 100px; } /* Anestesi */
 .patient-table th:nth-child(5), .patient-table td:nth-child(5) { width: 8%; min-width: 80px; } /* Jam Post-OP */
-.patient-table th:nth-child(6), .patient-table td:nth-child(6) { width: 10%; min-width: 120px; } /* PONV/RASS */
+.patient-table th:nth-child(6), .patient-table td:nth-child(6) { width: 10%; min-width: 110px; } /* PONV/RASS */
 .patient-table th:nth-child(7), .patient-table td:nth-child(7) { width: 8%; min-width: 90px; }  /* Mobilisasi */
 .patient-table th:nth-child(8), .patient-table td:nth-child(8) { width: 8%; min-width: 90px; }  /* Target */
-.patient-table th:nth-child(9), .patient-table td:nth-child(9) { width: 25%; min-width: 250px; white-space: normal; } /* Saran / Aksi */
+.patient-table th:nth-child(9), .patient-table td:nth-child(9) { width: 26%; min-width: 220px; white-space: normal; } /* Saran / Aksi */
 
 .suggestion-text {
     white-space: normal;

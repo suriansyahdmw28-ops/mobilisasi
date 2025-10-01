@@ -191,11 +191,13 @@ function listenForPatientUpdates() {
     
     onSnapshot(q, async snapshot => {
         allPatientsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        const activePatients = allPatientsData
-            .filter(p => p.status === 'aktif' && p.surgeryFinishTime)
-            .sort((a,b) => getSecondsFromTS(b.surgeryFinishTime) - getSecondsFromTS(a.surgeryFinishTime));
-        
-        await renderPatientTable(activePatients);
+        // VERSI BARU
+		const activePatients = allPatientsData
+    		.filter(p => p.status === 'aktif' && p.surgeryFinishTime) // Filter ini HANYA untuk tabel dasbor
+    		.sort((a,b) => getSecondsFromTS(b.surgeryFinishTime) - getSecondsFromTS(a.surgeryFinishTime));
+
+		// 'allPatientsData' yang berisi SEMUA pasien (aktif dan diarsipkan) akan digunakan untuk analisis
+		await renderPatientTable(activePatients);
 
     }, error => {
         console.error("Error listening to patient updates:", error);

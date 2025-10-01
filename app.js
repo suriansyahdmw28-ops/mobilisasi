@@ -270,27 +270,64 @@ async function saveNewPatient() {
     }
 }
 
+// VERSI BARU (SALIN DAN GANTIKAN FUNGSI LAMA)
 async function savePatientUpdate(e) {
-    if(!userId || !clinicId) return showToast("Koneksi ke database belum siap.", "error");
+    if (!userId || !clinicId) return showToast("Koneksi ke database belum siap.", "error");
     const patientId = e.target.dataset.id;
     const selectedNurse = document.getElementById('current-nurse-selector').value;
-    if(!selectedNurse) return showToast("Pilih nama perawat terlebih dahulu.", "warning");
+    if (!selectedNurse) return showToast("Pilih nama perawat terlebih dahulu.", "warning");
+
     const newObservation = {
         mobilityLevel: parseInt(document.getElementById('update-mobility').value),
         painScale: parseInt(document.getElementById('update-pain').value),
         ponv: document.getElementById('update-ponv').value,
         rass: document.getElementById('update-rass').value,
-        notes: document.getElementById('update-notes').value, // Dioptimalkan untuk AI
+        notes: document.getElementById('update-notes').value,
         nurse: selectedNurse,
         updatedBy: userId
     };
+
     try {
+        // Langkah 1: Simpan observasi baru seperti biasa
         await addObservationToPatient(patientId, newObservation);
         showToast("Observasi berhasil diperbarui.", "success");
         closePatientModal();
-    } catch (error) { 
-        console.error("Error updating patient:", error);
-        showToast("Gagal memperbarui data.", "error"); 
+
+        // --- PENAMBAHAN LOGIKA BARU DIMULAI DI SINI ---
+
+        // Langkah 2: Temukan data lengkap pasien yang baru saja diupdate
+        const patientToUpdate = allPatientsData.find(p => p.id === patientId);
+        if (!patientToUpdate) return;
+
+        // Buat objek pasien dengan data terbaru untuk dianalisis AI
+        const patientForAI = {
+            ...patientToUpdate,
+            latestObservation: newObservation // Gunakan observasi yang baru saja diinput
+        };
+
+        // Tampilkan status loading di baris tabel untuk user experience
+        const row = document.querySelector(`tr[data-patient-id="${patientId}"]`);
+        if (row) {
+            row.querySelector('.target-cell').innerHTML = `<div class="loading-state"><i class="fas fa-spinner fa-spin"></i> AI...</div>`;
+            const suggestionCell = row.querySelector('.suggestion-cell');
+            suggestionCell.querySelector('.loading-state').style.display = 'block';
+            suggestionCell.querySelector('.suggestion-content').style.display = 'none';
+        }
+
+        // Langkah 3: Panggil kembali AI untuk mendapatkan rencana baru
+        console.log("Meminta rencana AI baru setelah update...");
+        const newPlan = await getAIPlan(patientForAI);
+
+        // Langkah 4: Simpan rencana baru tersebut ke database
+        await saveTargetToDB(patientId, newPlan, "AI");
+        // Setelah ini, listener onSnapshot akan otomatis mendeteksi perubahan
+        // dan memperbarui tampilan tabel dengan target dan saran yang baru.
+
+        // --- AKHIR PENAMBAHAN LOGIKA BARU ---
+
+    } catch (error) {
+        console.error("Error updating patient and AI plan:", error);
+        showToast("Gagal memperbarui data & saran AI.", "error");
     }
 }
 

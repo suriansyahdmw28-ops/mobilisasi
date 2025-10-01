@@ -721,7 +721,7 @@ Tentukan target level yang paling TEPAT berdasarkan kondisi pasien.
 3.  Tuliskan **rasional Target** yang sangat jelas dan singkat. Contoh: "Pasien stabil tanpa red flags, siap progresi ke latihan berdiri untuk aktivasi otot postural." atau "Nyeri hebat menjadi penghalang utama, fokus pada manajemen nyeri sebelum progresi."
 
 #### **LANGKAH 3: PEMBUATAN SARAN & AKSI YANG SANGAT SPESIFIK (MINIMAL 3)**
-**PENTING: Total gabungan huruf untuk semua `saran` dalam `saranDanAksi` TIDAK BOLEH MELEBIHI 600 huruf.**
+**PENTING: Total gabungan huruf untuk semua \`saran\` dalam \`saranDanAksi\` TIDAK BOLEH MELEBIHI 600 huruf.**
 Buat rencana intervensi yang sangat detail dan personal berdasarkan SEMUA variabel pasien.
 
 -   **Berdasarkan LAMA POST-OP:**
@@ -768,7 +768,7 @@ Buat rencana intervensi yang sangat detail dan personal berdasarkan SEMUA variab
 
 ### **Format Output JSON (WAJIB)**
 {
-  "targetLevel": integer,
+  "targetLevel": "integer",
   "rasionalTarget": "string",
   "saranDanAksi": [
     {
@@ -1266,4 +1266,3 @@ function showConfirmationDialog(message, onConfirm) {
     };
     document.getElementById('confirm-cancel').onclick = closeDialog;
 }
-

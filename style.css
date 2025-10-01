@@ -118,6 +118,10 @@ p:last-child { margin-bottom: 0; }
 .status.status-level-1 { background-color: rgba(var(--color-error-rgb), 0.1); color: var(--color-error); border-color: rgba(var(--color-error-rgb),0.2); }
 .status.status-level-2, .status.status-level-3, .status.status-level-4 { background-color: rgba(var(--color-warning-rgb), 0.1); color: var(--color-warning); border-color: rgba(var(--color-warning-rgb),0.2); }
 .status.status-level-5, .status.status-level-6, .status.status-level-7, .status.status-level-8 { background-color: rgba(var(--color-success-rgb), 0.1); color: var(--color-success); border-color: rgba(var(--color-success-rgb),0.2); }
+.status.small-font {
+    font-size: 11px; /* Ukuran font lebih kecil */
+    padding: 3px 8px; /* Padding disesuaikan */
+}
 
 .container { width: 100%; max-width: 1280px; margin: 0 auto; padding: 0 var(--space-16); }
 .header { background: var(--color-surface); border-bottom: 1px solid var(--color-border); padding: var(--space-16) 0; }

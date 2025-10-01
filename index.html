@@ -169,7 +169,38 @@
                     <h3 class="section-title"><i class="fas fa-clipboard-question"></i> Analisis Efektivitas Edukasi</h3>
                     <p class="section-subtitle">Membandingkan tingkat pemahaman pasien sebelum dan sesudah intervensi.</p>
                     <div id="questionnaire-analysis-container">
+                        <div class="analysis-grid">
+                            <div class="stat-card">
+                                <div class="stat-icon"><i class="fas fa-question-circle"></i></div>
+                                <div class="stat-content">
+                                    <div class="stat-value" id="avg-pre-score">-</div>
+                                    <div class="stat-label">Rata-rata Skor Pre-Test</div>
+                                </div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-icon"><i class="fas fa-check-circle"></i></div>
+                                <div class="stat-content">
+                                    <div class="stat-value" id="avg-post-score">-</div>
+                                    <div class="stat-label">Rata-rata Skor Post-Test</div>
+                                </div>
+                            </div>
+                            <div class="stat-card success">
+                                <div class="stat-icon"><i class="fas fa-arrow-up"></i></div>
+                                <div class="stat-content">
+                                    <div class="stat-value" id="score-improvement">- %</div>
+                                    <div class="stat-label">Peningkatan Pemahaman</div>
+                                </div>
+                            </div>
                         </div>
+                        <div class="chart-container" style="margin-top: 24px;">
+                            <h4>Perbandingan Skor per Domain (Pre vs. Post Intervensi)</h4>
+                            <canvas id="domain-analysis-chart"></canvas>
+                        </div>
+                        <div class="interpretation-card" id="questionnaire-interpretation">
+                            <h4>Interpretasi</h4>
+                            <p>Memuat analisis...</p>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="analysis-section">

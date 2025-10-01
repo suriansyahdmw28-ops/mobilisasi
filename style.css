@@ -178,36 +178,32 @@ p:last-child { margin-bottom: 0; }
 .mobility-level-item p { font-size: var(--font-size-sm); line-height: 1.4; margin-bottom: 0; }
 .mobility-level-item p strong { color: var(--color-text); }
 .table-container { overflow-x: auto; background: var(--color-surface); border-radius: var(--radius-lg); border: 1px solid var(--color-card-border); margin-top: var(--space-24); }
-.patient-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.patient-table { width: 100%; border-collapse: collapse; }
 
 .patient-table th, .patient-table td {
-    padding: var(--space-8) var(--space-12); /* Mengurangi padding */
+    padding: var(--space-12) var(--space-16);
     text-align: left;
     border-bottom: 1px solid var(--color-border);
     vertical-align: middle;
-    font-size: var(--font-size-sm); /* Mengurangi ukuran font */
-    word-wrap: break-word; /* Memastikan teks bisa wrap */
+    font-size: var(--font-size-base);
+    word-wrap: break-word;
 }
 
-/* Penyesuaian lebar kolom agar lebih responsif */
-.patient-table th:nth-child(1), .patient-table td:nth-child(1) { width: 14%; } /* Pasien */
-.patient-table th:nth-child(2), .patient-table td:nth-child(2) { width: 6%; }  /* Umur / JK */
-.patient-table th:nth-child(3), .patient-table td:nth-child(3) { width: 10%; } /* Operasi */
-.patient-table th:nth-child(4), .patient-table td:nth-child(4) { width: 10%; } /* Anestesi */
-.patient-table th:nth-child(5), .patient-table td:nth-child(5) { width: 8%; } /* Jam Post-OP */
-.patient-table th:nth-child(6), .patient-table td:nth-child(6) { width: 12%; } /* Status Klinis */
-.patient-table th:nth-child(7), .patient-table td:nth-child(7) { width: 10%; } /* Mobilisasi */
-.patient-table th:nth-child(8), .patient-table td:nth-child(8) { width: 10%; } /* Target */
-.patient-table th:nth-child(9), .patient-table td:nth-child(9) { width: 20%; } /* Saran / Aksi */
+.patient-table th {
+    background-color: var(--color-bg-1);
+    font-weight: var(--font-weight-bold);
+    font-size: var(--font-size-sm);
+}
 
 .suggestion-text {
     white-space: normal;
-    font-size: 11px; /* Ukuran font lebih kecil untuk saran */
-    line-height: 1.4;
-    max-width: none;
+    font-size: var(--font-size-sm);
+    line-height: 1.5;
 }
 .suggestion-text .suggestion-item {
-    margin-bottom: 4px;
+    margin-bottom: 6px;
+    padding-left: 8px;
+    border-left: 3px solid rgba(var(--color-teal-500-rgb), 0.2);
 }
 .suggestion-text ul {
     padding-left: 15px;
@@ -217,8 +213,10 @@ p:last-child { margin-bottom: 0; }
     margin-bottom: 2px;
 }
 .suggestion-text i {
-    margin-right: 4px;
-    color: var(--color-text-secondary);
+    margin-right: 6px;
+    color: var(--color-primary);
+    width: 16px;
+    text-align: center;
 }
 
 /* Style untuk loading state dan AI badge */
@@ -234,7 +232,7 @@ p:last-child { margin-bottom: 0; }
     border-radius: var(--radius-full);
     font-size: 10px;
     font-weight: var(--font-weight-medium);
-    margin-left: var(--space-8);
+    margin-top: 8px;
     vertical-align: middle;
 }
 .ai-badge.fallback {
@@ -242,7 +240,6 @@ p:last-child { margin-bottom: 0; }
     color: var(--color-warning);
 }
 
-.patient-table th { background-color: var(--color-bg-1); font-weight: var(--font-weight-bold); font-size: var(--font-size-sm); }
 .patient-table tbody tr:hover { background-color: var(--color-secondary); }
 .patient-table .post-op-time { font-weight: var(--font-weight-medium); color: var(--color-primary); }
 .patient-table .no-data-row td { text-align: center; padding: var(--space-32); color: var(--color-text-secondary); white-space: normal; }
@@ -331,12 +328,66 @@ p:last-child { margin-bottom: 0; }
   }
 }
 
+/* --- PERBAIKAN TAMPILAN TABEL PADA MODE POTRAIT HP --- */
 @media (max-width: 768px) {
   .nav-item span { display: none; }
   .nav-item { min-width: 60px; justify-content: center;}
   .modal-grid { grid-template-columns: 1fr; }
   .page-header { flex-direction: column; align-items: stretch; }
   .page-header button { width: 100%; }
+
+  .table-container {
+      border: none;
+      background: transparent;
+  }
+  .patient-table, .patient-table thead, .patient-table tbody, .patient-table th, .patient-table td, .patient-table tr {
+      display: block;
+  }
+  .patient-table thead {
+      display: none;
+  }
+  .patient-table tr {
+      background: var(--color-surface);
+      border: 1px solid var(--color-card-border);
+      border-radius: var(--radius-lg);
+      margin-bottom: var(--space-16);
+      padding: var(--space-8);
+  }
+  .patient-table td {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: var(--space-8) var(--space-12);
+      border: none;
+      border-bottom: 1px dashed var(--color-border);
+      text-align: right;
+  }
+  .patient-table td:last-child {
+      border-bottom: none;
+  }
+  .patient-table td::before {
+      content: attr(data-label);
+      font-weight: var(--font-weight-bold);
+      text-align: left;
+      margin-right: var(--space-16);
+      color: var(--color-text);
+  }
+  /* Kolom Saran/Aksi dibuat lebih menonjol */
+  .suggestion-cell {
+      flex-direction: column;
+      align-items: flex-start !important;
+      gap: var(--space-12);
+  }
+   .suggestion-cell::before {
+      margin-bottom: var(--space-8);
+   }
+  .suggestion-content {
+      width: 100%;
+      text-align: left !important;
+  }
+  .action-buttons {
+      justify-content: flex-start;
+  }
 }
 
 .logo-image { height: 48px; width: auto; object-fit: contain; }
@@ -378,3 +429,4 @@ p:last-child { margin-bottom: 0; }
     height: 100%;
     border: 0;
 }
+

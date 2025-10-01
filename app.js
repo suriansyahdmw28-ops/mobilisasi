@@ -641,21 +641,21 @@ async function renderPatientTable(patients) {
 	const currentMobilityInfo = appData.mobilityScale.find(l => l.level === latestObs.mobilityLevel) || { name: `Level ${latestObs.mobilityLevel}` };
         return `
             <tr data-patient-id="${p.id}">
-                <td><strong>${p.name}</strong><br><small>${p.rm}</small></td>
-                <td>${p.age} thn<br><small>${p.gender}</small></td>
-                <td>${p.operation}</td>
-                <td>${p.anesthesia}</td>
-                <td class="post-op-time" data-timestamp="${finishTimestamp}">${formatPostOpDuration(finishTimestamp)}</td>
-                <td>
+                <td data-label="Pasien"><strong>${p.name}</strong><br><small>${p.rm}</small></td>
+                <td data-label="Umur/JK">${p.age} thn<br><small>${p.gender}</small></td>
+                <td data-label="Operasi">${p.operation}</td>
+                <td data-label="Anestesi">${p.anesthesia}</td>
+                <td data-label="Jam Post-OP" class="post-op-time" data-timestamp="${finishTimestamp}">${formatPostOpDuration(finishTimestamp)}</td>
+                <td data-label="Status Klinis">
                     <small>
                         <strong>PONV:</strong> ${latestObs.ponv}<br>
                         <strong>RASS:</strong> ${latestObs.rass}<br>
                         <strong>Nyeri:</strong> <span class="status ${painClass}" style="padding: 2px 6px; font-size: 11px;">${painScore}/10</span>
                     </small>
                 </td>
-                <td><span class="status status-level-${latestObs.mobilityLevel} small-font">${currentMobilityInfo.name}</span></td>
-                <td class="target-cell"><div class="loading-state"><i class="fas fa-spinner fa-spin"></i> AI...</div></td>
-                <td class="suggestion-cell">
+                <td data-label="Mobilisasi"><span class="status status-level-${latestObs.mobilityLevel} small-font">${currentMobilityInfo.name}</span></td>
+                <td data-label="Target" class="target-cell"><div class="loading-state"><i class="fas fa-spinner fa-spin"></i> AI...</div></td>
+                <td data-label="Saran/Aksi" class="suggestion-cell">
                     <div class="loading-state"><i class="fas fa-spinner fa-spin"></i> Menganalisis...</div>
                     <div class="suggestion-content" style="display:none;">
                          <div class="suggestion-text"></div>
@@ -696,40 +696,76 @@ async function getAIPlan(patient) {
     const latestObs = patient.latestObservation || { mobilityLevel: 1, ponv: 'Tidak ada keluhan', rass: '0: Alert & Calm', painScale: 0, notes: '' };
     const hoursPostOp = (Date.now() - (getSecondsFromTS(patient.surgeryFinishTime) * 1000)) / (3600 * 1000);
 
-    const systemPrompt = `Anda adalah seorang Perawat Klinis Ahli (Clinical Nurse Specialist) dengan spesialisasi dalam program Enhanced Recovery After Surgery (ERAS) di sebuah rumah sakit terkemuka di Indonesia. Gaya komunikasi Anda empatik, jelas, dan memotivasi. Tugas Anda adalah membuat rencana mobilisasi dini yang sangat personal dan holistik berdasarkan data pasien yang kompleks. Jawaban Anda WAJIB dalam format JSON yang valid.
+    const systemPrompt = `Anda adalah seorang Perawat Spesialis Klinis (Clinical Nurse Specialist) ahli ERAS dari Indonesia. Anda menganalisis data pasien secara mendalam untuk memberikan rencana mobilisasi yang sangat spesifik, aman, dan berbasis bukti. Jawaban WAJIB dalam format JSON.
 
-### Proses Berpikir Wajib Anda (Langkah-demi-Langkah):
+### **SOP (Standard Operating Procedure) Analisis & Perencanaan**
 
-1.  **Analisis Keselamatan (Red Flags):**
-    * Periksa **NYERI**: Jika skala nyeri > 4, ini adalah prioritas utama. Rencana harus fokus pada manajemen nyeri sebelum progresi.
-    * Periksa **PONV**: Jika ada mual/muntah aktif, progresi mobilisasi ditunda. Fokus pada manajemen gejala.
-    * Periksa **RASS**: Jika RASS bukan '0: Alert & Calm', pasien belum siap untuk mobilisasi aktif. Fokus pada observasi kesadaran dan keselamatan.
-    * Periksa **ANESTESI**: Jika anestesi 'Spinal' dan post-op < 12 jam, risiko hipotensi ortostatik tinggi. Target MAKSIMAL adalah Level 1 (miring kanan-kiri).
+#### **LANGKAH 1: IDENTIFIKASI "RED FLAGS" (KESELAMATAN UTAMA)**
+Analisis kondisi yang menjadi kontraindikasi absolut untuk progresi mobilisasi.
+- **NYERI HEBAT (Skala > 6):** Target **TIDAK BOLEH NAIK**. Fokus utama adalah manajemen nyeri.
+- **PONV BERAT (Muntah >2 kali):** Target **TIDAK BOLEH NAIK**. Fokus atasi mual-muntah dan risiko dehidrasi.
+- **GANGGUAN KESADARAN (RASS bukan '0' atau '-1'):** Target **TIDAK BOLEH NAIK**. Fokus pada observasi neurologis dan keselamatan pasien dari risiko jatuh/cedera.
+- **EFEK ANESTESI SPINAL (Jam Post-Op < 12 jam DAN Anestesi Spinal):** Target **MAKSIMAL LEVEL 1**. Progresi ke duduk/berdiri berisiko tinggi hipotensi ortostatik berat.
 
-2.  **Analisis Kontekstual Pasien:**
-    * **Umur:** Pertimbangkan risiko pada pasien geriatri (>60 tahun) seperti risiko jatuh, delirium, dan kelemahan otot. Berikan saran yang berfokus pada keselamatan. Untuk pasien muda (<40 tahun), berikan motivasi yang lebih menantang.
-    * **Jenis Operasi:** Bedakan antara operasi mayor (Laparotomy, ORIF, Mastectomy) dan minor (Appendectomy, Hernia). Pasien post-op mayor membutuhkan progresi yang lebih hati-hati dan manajemen nyeri yang lebih intensif.
-    * **Jam Post-Op:** Fase sangat dini (0-6 jam) fokus pada latihan di tempat tidur. Fase dini (6-24 jam) targetnya duduk/berdiri. Fase progresif (>24 jam) targetnya berjalan.
-    * **Jenis Kelamin:** Ini kurang berpengaruh, tetapi bisa digunakan untuk personalisasi sapaan atau contoh aktivitas jika relevan.
+#### **LANGKAH 2: PENENTUAN TARGET LEVEL MOBILISASI**
+Tentukan target level yang paling TEPAT berdasarkan kondisi pasien.
+1.  Jika ada **SATU atau LEBIH "Red Flag"** dari Langkah 1, **Target Level = Level Saat Ini**.
+2.  Jika **TIDAK ADA "Red Flag"**, maka **Target Level = Level Saat Ini + 1**.
+3.  Tuliskan **rasional Target** yang sangat jelas dan singkat. Contoh: "Pasien stabil tanpa red flags, siap progresi ke latihan berdiri untuk aktivasi otot postural." atau "Nyeri hebat menjadi penghalang utama, fokus pada manajemen nyeri sebelum progresi."
 
-3.  **Penentuan Rencana:**
-    * **Target Level:** Berdasarkan analisis di atas, tentukan 'targetLevel' yang paling AMAN dan REALISTIS. Jika ada red flag, 'targetLevel' SAMA DENGAN level saat ini. Jika aman, naikkan SATU level.
-    * **Rasional Target:** Berikan 'rasionalTarget' yang jelas dan singkat mengapa level tersebut dipilih. Contoh: "Fokus pada manajemen nyeri hebat yang menjadi penghalang utama mobilisasi." atau "Pasien stabil dan dalam fase progresif, siap untuk memulai latihan berjalan."
-    * **Saran dan Aksi (WAJIB MINIMAL 3 OPSI):** Buat array 'saranDanAksi'. Setiap saran harus masuk akal secara klinis dan kreatif. Berikan opsi dari berbagai kategori untuk pendekatan holistik. Kategori yang bisa digunakan: 'Aktivitas Fisik', 'Manajemen Nyeri & Gejala', 'Edukasi Pasien & Keluarga', 'Dukungan Psikologis', 'Nutrisi & Hidrasi', 'Keselamatan'. Gunakan tag HTML (<strong>, <ul>, <li>) untuk format yang kaya.
+#### **LANGKAH 3: PEMBUATAN SARAN & AKSI YANG SANGAT SPESIFIK (MINIMAL 3)**
+Buat rencana intervensi yang sangat detail dan personal berdasarkan SEMUA variabel pasien.
 
-### Format Output JSON (WAJIB DIPATUHI):
+-   **Berdasarkan LAMA POST-OP:**
+    -   **0-2 Jam:** Fokus Latihan napas dalam, batuk efektif (dengan bantal), gerak pergelangan tangan/kaki.
+    -   **2-6 Jam:** Targetkan miring kanan-kiri tiap 2 jam (jika bukan red flag spinal).
+    -   **6-12 Jam:** Targetkan duduk di tepi tempat tidur dengan bantuan, observasi TTV pre/post.
+    -   **12-24 Jam:** Targetkan berdiri di samping tempat tidur.
+    -   **>24 Jam:** Targetkan berjalan beberapa langkah, lalu tingkatkan jarak.
 
+-   **Berdasarkan JENIS OPERASI:**
+    -   **Abdomen (Laparotomi, Appendectomy):** "Ajarkan cara memegang bantal di atas luka saat batuk/bergerak untuk mengurangi nyeri (abdominal splinting)."
+    -   **Ekstremitas Bawah (ORIF):** "Kolaborasi dengan fisioterapi untuk protokol weight-bearing yang diizinkan. Fokus pada penguatan otot quadrisep."
+    -   **Hernia:** "Edukasi untuk menghindari mengejan dan mengangkat beban berat. Anjurkan berdiri perlahan."
+    -   **Mastectomy:** "Latih ROM aktif pada lengan sisi operasi sesuai anjuran (misal: merayap di dinding), waspadai drain."
+
+-   **Berdasarkan USIA:**
+    -   **Anak (<17):** "Gunakan pendekatan bermain, misal 'Ayo kita berjalan mengambil mainan favoritmu'."
+    -   **Dewasa (18-59):** "Fokus pada tujuan fungsional, misal 'Target kita hari ini adalah bisa berjalan ke kamar mandi sendiri'."
+    -   **Geriatri (>60):** "**Prioritaskan pencegahan jatuh!** Pastikan ada pendampingan, gunakan alat bantu (walker), dan pastikan alas kaki anti-slip."
+
+-   **Berdasarkan GENDER:**
+    -   **Laki-laki:** "Ajak pasien melakukan aktivitas fungsional yang biasa dilakukan, seperti berdiri untuk menyisir rambut atau bercukur di wastafel."
+    -   **Perempuan:** "Kaitkan mobilisasi dengan rutinitas, seperti duduk di kursi untuk merias wajah atau berjalan ke jendela melihat pemandangan."
+
+-   **Berdasarkan NYERI:**
+    -   **Ringan (1-3):** "Berikan analgesik oral 30 menit *sebelum* mobilisasi. Gunakan kompres dingin/hangat."
+    -   **Sedang (4-6):** "Evaluasi efektivitas analgesik. Pertimbangkan kolaborasi untuk penyesuaian dosis. Ajarkan teknik distraksi (musik, video)."
+    -   **Berat (>6):** "**STOP progresi!** Lapor dokter jaga. Fokus pada asesmen nyeri komprehensif dan intervensi farmakologis."
+
+-   **Berdasarkan PONV:**
+    -   **Mual tanpa muntah:** "Anjurkan minum teh hangat/air jahe. Sediakan kantong muntah. Hindari bau menyengat."
+    -   **Muntah 1-2 kali:** "Berikan antiemetik sesuai advis. Jaga hidrasi dengan cairan oralit/infus."
+    -   **Muntah >2 kali:** "**STOP progresi!** Lapor dokter jaga. Risiko dehidrasi & ketidakseimbangan elektrolit."
+
+-   **Berdasarkan RASS:**
+    -   **RASS -1 (Drowsy):** "Lakukan stimulasi verbal yang sering untuk menjaga pasien tetap terjaga saat latihan."
+    -   **RASS +1 (Restless):** "Cari penyebab kegelisahan (kandung kemih penuh, nyeri, hipoksia?). Libatkan keluarga untuk menenangkan."
+    -   **RASS lain (selain 0/-1):** "**STOP progresi!** Observasi ketat. Pastikan keamanan tempat tidur (side rail naik)."
+
+-   **Berdasarkan CATATAN PERAWAT (FLEKSIBEL):**
+    -   Jika ada "cemas" atau "takut": "Lakukan validasi perasaan pasien. Jelaskan setiap langkah secara perlahan. Tawarkan kehadiran keluarga."
+    -   Jika ada "terpasang drain": "Amankan posisi drain sebelum bergerak. Edukasi pasien dan keluarga cara memegang botol drain."
+    -   Jika ada "riwayat jatuh": "**Implementasikan protokol risiko jatuh tinggi!** Selalu ada 2 orang yang mendampingi saat mobilisasi pertama."
+
+### **Format Output JSON (WAJIB)**
 {
   "targetLevel": integer,
   "rasionalTarget": "string",
   "saranDanAksi": [
     {
-      "kategori": "string",
-      "saran": "string (format HTML)"
-    },
-    {
-      "kategori": "string",
-      "saran": "string (format HTML)"
+      "kategori": "string (Contoh: 'Aktivitas Fisik', 'Manajemen Nyeri & Gejala', dll.)",
+      "saran": "string (Gunakan format HTML: <strong>, <ul>, <li>)"
     }
   ]
 }
@@ -748,10 +784,10 @@ async function getAIPlan(patient) {
     - Skala Nyeri (0-10): ${latestObs.painScale}
     - Catatan Tambahan Dari Perawat: "${latestObs.notes || 'Tidak ada'}"
 
-    Berdasarkan data di atas, berikan rekomendasi mobilisasi dalam format JSON yang diminta.`;
+    Berdasarkan SOP di atas, berikan rencana dalam format JSON.`;
 
     try {
-        const apiKey = ""; // API Key Anda akan disisipkan di sini oleh environment
+        const apiKey = ""; // API Key will be injected by the environment
         const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
         
         const payload = {
@@ -786,88 +822,13 @@ async function getAIPlan(patient) {
 
     } catch (error) {
         console.warn("AI recommendation failed, falling back to rule-based logic.", error);
-        return getRuleBasedPlan(patient);
+        // Fallback logic can be enhanced but is kept simple for now
+        return {
+            targetLevel: latestObs.mobilityLevel,
+            rasionalTarget: "Gagal memproses data AI, kembali ke mode observasi aman.",
+            saranDanAksi: [{ kategori: "Observasi", saran: "Terjadi kesalahan saat mengambil saran AI. <strong>Lanjutkan observasi manual</strong> dan laporkan jika terjadi perubahan kondisi signifikan." }]
+        };
     }
-}
-
-function getRuleBasedPlan(patient) {
-    const latestObs = patient.latestObservation || { mobilityLevel: 1, ponv: 'Tidak ada keluhan', rass: '0: Alert & Calm', painScale: 0 };
-    const hoursPostOp = (Date.now() - (getSecondsFromTS(patient.surgeryFinishTime) * 1000)) / (3600 * 1000);
-    const { age, operation, anesthesia } = patient;
-    const { mobilityLevel: currentLevel, painScale, ponv, rass } = latestObs;
-
-    let targetLevel = currentLevel;
-    let rasionalTarget = "Fokus pada stabilisasi kondisi dan manajemen gejala.";
-    let saranDanAksi = [];
-
-    const hasPain = painScale > 4;
-    const hasPonv = ponv !== 'Tidak ada keluhan';
-    const hasRassIssue = !rass.startsWith('0:');
-    const isSpinalEarly = anesthesia.includes('Spinal') && hoursPostOp < 12;
-    const isGeriatric = age > 60;
-    const isMajorOp = ['Laparotomy', 'Mastectomy', 'ORIF', 'ROI'].some(op => operation.includes(op));
-    
-    const hasRedFlag = hasPain || hasPonv || hasRassIssue || isSpinalEarly;
-
-    // --- Hasilkan Saran Berdasarkan Kondisi ---
-
-    if (hasPain) {
-        saranDanAksi.push({ kategori: 'Manajemen Nyeri & Gejala', saran: '<strong>Prioritaskan manajemen nyeri.</strong><ul><li>Kolaborasi dengan dokter untuk analgesik.</li><li>Tawarkan teknik non-farmakologis (napas dalam, distraksi).</li></ul>' });
-    }
-    if (hasPonv) {
-        saranDanAksi.push({ kategori: 'Manajemen Nyeri & Gejala', saran: '<strong>Atasi mual & muntah.</strong><ul><li>Berikan antiemetik sesuai advis.</li><li>Anjurkan minum sedikit demi sedikit tapi sering.</li></ul>' });
-    }
-    if (hasRassIssue) {
-        saranDanAksi.push({ kategori: 'Keselamatan', saran: '<strong>Observasi tingkat kesadaran.</strong><ul><li>Lakukan re-orientasi secara berkala.</li><li>Pastikan lingkungan aman dan bel terjangkau.</li></ul>' });
-    }
-    if (isSpinalEarly) {
-        targetLevel = 1; // Paksa target
-        rasionalTarget = "Pemulihan anestesi spinal, fokus cegah hipotensi ortostatik.";
-        saranDanAksi.push({ kategori: 'Aktivitas Fisik', saran: '<strong>Tirah baring total.</strong><ul><li>Latih gerak pergelangan kaki setiap jam.</li><li>Fokus miring kanan/kiri setiap 2 jam untuk mencegah luka tekan.</li></ul>' });
-    }
-    if (isGeriatric) {
-        saranDanAksi.push({ kategori: 'Keselamatan', saran: '<strong>Perhatian khusus pasien geriatri.</strong><ul><li>Edukasi keluarga tentang risiko jatuh.</li><li>Pastikan pencahayaan ruangan cukup.</li></ul>' });
-    }
-    if (isMajorOp) {
-        saranDanAksi.push({ kategori: 'Edukasi Pasien & Keluarga', saran: '<strong>Edukasi pasca-op mayor.</strong><ul><li>Jelaskan bahwa pemulihan butuh waktu dan kesabaran.</li><li>Tekankan pentingnya batuk efektif dengan penyangga bantal.</li></ul>' });
-    }
-
-    // --- Logika Progresi Jika Tidak Ada Red Flag ---
-    if (!hasRedFlag) {
-        targetLevel = Math.min(currentLevel + 1, 8);
-        rasionalTarget = "Pasien stabil, progresi bertahap untuk akselerasi pemulihan.";
-        
-        switch(targetLevel) {
-            case 2:
-                saranDanAksi.push({ kategori: 'Aktivitas Fisik', saran: '<strong>Target: Duduk di tepi tempat tidur.</strong><ul><li>Lakukan dengan bantuan, observasi pusing.</li><li>Target durasi: 5-10 menit, 2-3 kali sehari.</li></ul>' });
-                break;
-            case 3:
-                saranDanAksi.push({ kategori: 'Aktivitas Fisik', saran: '<strong>Target: Berdiri.</strong><ul><li>Berdiri di samping tempat tidur selama 1 menit.</li><li>Gunakan penyangga seperti meja/pegangan.</li></ul>' });
-                break;
-            case 4:
-                saranDanAksi.push({ kategori: 'Aktivitas Fisik', saran: '<strong>Target: Jalan di tempat.</strong><ul><li>Lakukan 20 langkah di tempat sambil berpegangan.</li><li>Ini melatih kekuatan otot kaki.</li></ul>' });
-                break;
-            default:
-                 saranDanAksi.push({ kategori: 'Aktivitas Fisik', saran: '<strong>Target: Berjalan.</strong><ul><li>Mulai berjalan pendek di koridor dengan pendampingan.</li><li>Tingkatkan jarak secara bertahap.</li></ul>' });
-                break;
-        }
-
-        saranDanAksi.push({ kategori: 'Dukungan Psikologis', saran: '<strong>Beri pujian & motivasi.</strong><ul><li>Apresiasi setiap kemajuan kecil yang dicapai pasien.</li><li>Tanyakan apa yang membuat pasien cemas untuk bergerak.</li></ul>' });
-        saranDanAksi.push({ kategori: 'Edukasi Pasien & Keluarga', saran: '<strong>Libatkan keluarga secara aktif.</strong><ul><li>Ajarkan keluarga cara membantu yang aman.</li><li>Jadikan keluarga sebagai "suporter" utama pasien.</li></ul>' });
-        if (painScale > 0 && painScale <= 4) {
-             saranDanAksi.push({ kategori: 'Manajemen Nyeri & Gejala', saran: '<strong>Manajemen nyeri ringan.</strong><ul><li>Tawarkan analgesik oral 30 menit sebelum mobilisasi.</li><li>Ingatkan kembali teknik relaksasi.</li></ul>' });
-        }
-    }
-    
-    // Saran default jika tidak ada yang cocok
-    if (saranDanAksi.length === 0) {
-        saranDanAksi.push({
-            kategori: 'Observasi',
-            saran: '<strong>Lanjutkan observasi.</strong><ul><li>Monitor TTV dan keluhan pasien secara berkala.</li><li>Pastikan pasien nyaman dan terhidrasi.</li></ul>'
-        });
-    }
-
-    return { targetLevel, rasionalTarget, saranDanAksi };
 }
 
 
@@ -1276,3 +1237,4 @@ function showConfirmationDialog(message, onConfirm) {
     };
     document.getElementById('confirm-cancel').onclick = closeDialog;
 }
+

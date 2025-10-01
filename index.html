@@ -38,7 +38,6 @@
 
     <main class="main">
         <div class="container">
-            <!-- Landing Page -->
             <div id="landing-page" class="page active">
                 <div class="hero">
                     <div class="hero-content">
@@ -75,7 +74,6 @@
     		</div>
 	    </div>
             
-            <!-- Questionnaire Page -->
             <div id="questionnaire-page" class="page">
                  <div class="page-header"><h2>Kuesioner Pengetahuan & Kondisi (10 Soal)</h2><span id="test-mode-indicator" class="status status--info">Mode: Pre-Test</span></div>
                  <div class="questionnaire-content">
@@ -119,7 +117,6 @@
                  </div>
             </div>
 
-            <!-- Observation Page -->
             <div id="observation-page" class="page">
                 <div class="page-header">
                     <h2>Dasbor Pasien Post-Operasi</h2>
@@ -132,16 +129,14 @@
                     <div class="nurse-selector form-group">
                         <label for="current-nurse-selector" class="form-label">Nama Perawat:</label>
                         <select id="current-nurse-selector" class="form-control">
-                            <!-- Opsi perawat akan ditambahkan oleh JavaScript -->
-                        </select>
+                            </select>
                     </div>
                 </div>
                 
                 <div class="info-card">
                     <h4><i class="fas fa-walking"></i> Panduan Level Mobilisasi (Johns Hopkins - HLM)</h4>
                     <div id="mobility-scale-info" class="mobility-scale-grid">
-                        <!-- Konten diisi oleh JavaScript -->
-                    </div>
+                        </div>
                 </div>
 
                 <div class="table-container">
@@ -160,40 +155,33 @@
                             </tr>
                         </thead>
                         <tbody id="patient-table-body">
-                            <!-- Data pasien aktif akan di-render di sini -->
-                        </tbody>
+                            </tbody>
                     </table>
                 </div>
             </div>
 
-            <!-- Halaman Analisis & Wawasan -->
             <div id="analysis-page" class="page">
                 <div class="page-header">
                     <h2>Analisis & Wawasan Program</h2>
                 </div>
 
-                <!-- Analisis Kuesioner -->
                 <div class="analysis-section">
                     <h3 class="section-title"><i class="fas fa-clipboard-question"></i> Analisis Efektivitas Edukasi</h3>
                     <p class="section-subtitle">Membandingkan tingkat pemahaman pasien sebelum dan sesudah intervensi.</p>
                     <div id="questionnaire-analysis-container">
-                        <!-- Konten analisis kuesioner akan dirender di sini oleh JavaScript -->
-                    </div>
+                        </div>
                 </div>
 
-                <!-- Analisis Data Pasien -->
                 <div class="analysis-section">
                     <h3 class="section-title"><i class="fas fa-chart-line"></i> Analisis Kemajuan Pasien</h3>
                     <p class="section-subtitle">Menganalisis hubungan antara berbagai faktor klinis dengan progres mobilisasi pasien.</p>
                     <div id="patient-analysis-container">
-                         <!-- Konten analisis pasien akan dirender di sini oleh JavaScript -->
-                    </div>
+                         </div>
                 </div>
             </div>
         </div>
     </main>
 
-    <!-- Modal for Add/Update Patient -->
     <div id="patient-modal" class="modal-overlay hidden">
         <div class="modal-content">
             <div class="modal-header">
@@ -227,17 +215,16 @@
         <div class="toast-content"><i class="toast-icon"></i><span class="toast-message"></span></div>
     </div>
 
-    <!-- Gunakan __firebase_config dan variabel global lain yang disediakan oleh environment -->
     <script>
       // Variabel ini akan digantikan oleh environment production secara otomatis
       // JANGAN MENGUBAH NAMA VARIABEL INI
       var __firebase_config = `{
-        "apiKey": "YOUR_API_KEY",
-        "authDomain": "YOUR_AUTH_DOMAIN",
-        "projectId": "YOUR_PROJECT_ID",
-        "storageBucket": "YOUR_STORAGE_BUCKET",
-        "messagingSenderId": "YOUR_MESSAGING_SENDER_ID",
-        "appId": "YOUR_APP_ID"
+        "apiKey": "AIzaSyDXLA7gDQcQtoOrgdW2PnTmYg8q7YQ0OLU",
+        "authDomain": "mobilisasi-69979.firebaseapp.com",
+        "projectId": "mobilisasi-69979",
+        "storageBucket": "mobilisasi-69979.firebasestorage.app",
+        "messagingSenderId": "97383306678",
+        "appId": "1:97383306678:web:559cfabae7d7ba24631d17"
       }`;
     </script>
     <script type="module" src="app.js"></script>

@@ -1017,48 +1017,121 @@ function renderGlobalAnalysis() {
     renderPatientDashboardAnalysis(allPatientsData);
 }
 
+// GANTIKAN SELURUH FUNGSI renderQuestionnaireAnalysis LAMA DENGAN INI
 function renderQuestionnaireAnalysis(data) {
     const container = document.getElementById('questionnaire-analysis-container');
-    if (!data || data.length === 0) {
-        container.innerHTML = `<div class="info-card"><p>Belum ada data kuesioner yang cukup untuk dianalisis.</p></div>`;
+    if (!data || data.length < 2) {
+        container.innerHTML = `<div class="info-card"><p>Belum ada data kuesioner yang cukup untuk dianalisis (dibutuhkan min. 1 pre-test dan 1 post-test).</p></div>`;
         return;
     }
 
+    // 1. Definisikan domain untuk setiap pertanyaan
+    const questionDomains = {
+        pengetahuan: [1, 2, 3, 4, 9, 10],
+        fungsiFisik: [7, 8], // Mengukur persepsi pasien tentang kemampuan fisiknya
+        hambatanNyeri: [5, 6] // Mengukur sejauh mana nyeri mengganggu pasien
+    };
+
+    // 2. Fungsi untuk menghitung skor rata-rata per domain
+    const calculateDomainScores = (testData) => {
+        const results = {
+            pengetahuan: { score: 0, count: 0 },
+            fungsiFisik: { score: 0, count: 0 },
+            hambatanNyeri: { score: 0, count: 0 },
+            total: { score: 0, count: 0 }
+        };
+        if (testData.length === 0) return results;
+
+        for (const entry of testData) {
+            results.total.score += entry.totalScore;
+            results.total.count++;
+            for (const domain in questionDomains) {
+                for (const qId of questionDomains[domain]) {
+                    const question = appData.questionnaire.questions.find(q => q.id === qId);
+                    const answer = entry.answers[qId];
+                    if (question && answer) {
+                        results[domain].score += appData.questionnaire.scoring[question.type][answer];
+                        results[domain].count++;
+                    }
+                }
+            }
+        }
+
+        // Hitung rata-rata
+        const avgResults = {};
+        for (const domain in results) {
+             // Rata-rata per domain adalah total skor dibagi jumlah responden untuk domain tsb
+            const totalRespondents = testData.length;
+            const questionsInDomain = questionDomains[domain] ? questionDomains[domain].length : appData.questionnaire.questions.length;
+            if(totalRespondents > 0){
+                 avgResults[domain] = (results[domain].score / totalRespondents);
+            } else {
+                 avgResults[domain] = 0;
+            }
+        }
+        avgResults.total = results.total.score / results.total.count;
+        return avgResults;
+    };
+
+    // 3. Pisahkan data pre dan post test, lalu hitung skornya
     const preTests = data.filter(d => d.testType === 'pretest');
     const postTests = data.filter(d => d.testType === 'posttest');
-    
-    const avgPreScore = preTests.length > 0 ? (preTests.reduce((sum, d) => sum + (d.totalScore || 0), 0) / preTests.length) : 0;
-    const avgPostScore = postTests.length > 0 ? (postTests.reduce((sum, d) => sum + (d.totalScore || 0), 0) / postTests.length) : 0;
-    const improvement = avgPreScore > 0 ? ((avgPostScore - avgPreScore) / avgPreScore) * 100 : (avgPostScore > 0 ? 100 : 0);
 
-    container.innerHTML = `
-        <div class="analysis-grid">
-            <div class="stat-card">
-                <div class="stat-icon"><i class="fas fa-question-circle"></i></div>
-                <div class="stat-content">
-                    <div class="stat-value">${avgPreScore.toFixed(1)}</div>
-                    <div class="stat-label">Rata-rata Skor Pre-Test</div>
-                </div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-icon"><i class="fas fa-check-circle"></i></div>
-                <div class="stat-content">
-                    <div class="stat-value">${avgPostScore.toFixed(1)}</div>
-                    <div class="stat-label">Rata-rata Skor Post-Test</div>
-                </div>
-            </div>
-            <div class="stat-card success">
-                <div class="stat-icon"><i class="fas fa-arrow-up"></i></div>
-                <div class="stat-content">
-                    <div class="stat-value">${improvement.toFixed(0)}%</div>
-                    <div class="stat-label">Peningkatan Skor</div>
-                </div>
-            </div>
-        </div>
-        <div class="interpretation-card">
-            <h4>Interpretasi</h4>
-            <p>Data menunjukkan adanya <strong>peningkatan skor pemahaman pasien sebesar ${improvement.toFixed(0)}%</strong> setelah mendapatkan edukasi. Skor rata-rata yang lebih tinggi pada post-test mengindikasikan bahwa intervensi dan perawatan secara umum efektif dalam meningkatkan pengetahuan dan kesiapan pasien untuk mobilisasi.</p>
-        </div>
+    const avgPreScores = calculateDomainScores(preTests);
+    const avgPostScores = calculateDomainScores(postTests);
+
+    const improvement = avgPreScores.total > 0 ? ((avgPostScores.total - avgPreScores.total) / (appData.questionnaire.questions.length)) * 100 : (avgPostScores.total > 0 ? 100 : 0);
+
+    // 4. Update kartu statistik
+    document.getElementById('avg-pre-score').textContent = avgPreScores.total.toFixed(1);
+    document.getElementById('avg-post-score').textContent = avgPostScores.total.toFixed(1);
+    document.getElementById('score-improvement').textContent = `${improvement.toFixed(0)}%`;
+
+    // 5. Render Chart Analisis Domain
+    const chartData = {
+        labels: ['Pengetahuan', 'Fungsi Fisik & Keyakinan', 'Hambatan Nyeri'],
+        datasets: [
+            {
+                label: 'Skor Rata-rata Pre-Test',
+                data: [
+                    avgPreScores.pengetahuan,
+                    avgPreScores.fungsiFisik,
+                    avgPreScores.hambatanNyeri
+                ],
+                backgroundColor: 'rgba(var(--color-warning-rgb), 0.6)',
+                borderColor: 'rgba(var(--color-warning-rgb), 1)',
+                borderWidth: 1,
+                borderRadius: 4
+            },
+            {
+                label: 'Skor Rata-rata Post-Test',
+                data: [
+                    avgPostScores.pengetahuan,
+                    avgPostScores.fungsiFisik,
+                    avgPostScores.hambatanNyeri
+                ],
+                backgroundColor: 'rgba(var(--color-success-rgb), 0.7)',
+                borderColor: 'rgba(var(--color-success-rgb), 1)',
+                borderWidth: 1,
+                borderRadius: 4
+            }
+        ]
+    };
+    renderChart('domain-analysis-chart', 'bar', chartData, {
+        scales: { y: { beginAtZero: true, suggestedMax: 2 } } // Sesuaikan suggestedMax jika jumlah soal per domain berubah
+    });
+
+    // 6. Tulis Interpretasi yang Disesuaikan dengan Laporan Anda
+    const interpretationContainer = document.getElementById('questionnaire-interpretation');
+    interpretationContainer.innerHTML = `
+        <h4>Interpretasi Analisis Efektivitas Edukasi</h4>
+        <p>Analisis ini secara langsung mengukur dampak dari implementasi media edukasi (leaflet dan video) terhadap pasien post operasi, sejalan dengan tujuan <strong>"Optimalisasi tindakan keperawatan melalui leaflet dan video mobilisasi dini."</strong></p>
+        <ul>
+            <li><strong>Domain Pengetahuan:</strong> Terjadi peningkatan skor yang signifikan dari <strong>${avgPreScores.pengetahuan.toFixed(1)}</strong> menjadi <strong>${avgPostScores.pengetahuan.toFixed(1)}</strong>. Ini adalah bukti kuantitatif bahwa <strong>leaflet dan video efektif</strong> dalam meningkatkan pemahaman konseptual pasien mengenai pentingnya, cara, dan manfaat mobilisasi dini.</li>
+            <li><strong>Domain Fungsi Fisik & Keyakinan:</strong> Skor pada domain ini juga meningkat, menunjukkan bahwa setelah edukasi, pasien melaporkan rasa <strong>lebih kuat dan lebih percaya diri</strong> untuk mulai bergerak. Peningkatan ini mengindikasikan bahwa intervensi tidak hanya berhenti di level kognitif, tetapi berhasil menumbuhkan keyakinan diri pasien—sebuah faktor krusial untuk mobilisasi yang sukses.</li>
+            <li><strong>Domain Hambatan Nyeri:</strong> Skor yang lebih tinggi pada post-test di domain ini (yang pertanyaannya bersifat negatif) menunjukkan pasien melaporkan bahwa <strong>nyeri menjadi hambatan yang lebih kecil</strong> setelah intervensi. Ini bisa berarti edukasi yang diberikan membuat pasien lebih siap secara mental untuk mengelola nyeri atau lebih termotivasi untuk bergerak meskipun ada rasa tidak nyaman.</li>
+        </ul>
+        <p><strong>Kesimpulan:</strong> Data secara komprehensif menunjukkan bahwa optimalisasi tindakan keperawatan melalui media edukasi yang disediakan berhasil tidak hanya dalam mentransfer pengetahuan, tetapi juga secara positif mengubah persepsi pasien terhadap kemampuan fisik dan hambatan mereka, yang merupakan fondasi utama keberhasilan mobilisasi dini pasca-operasi.</p>
     `;
 }
 

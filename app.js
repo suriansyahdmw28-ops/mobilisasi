@@ -46,6 +46,7 @@ let userId, clinicId;
 let allPatientsData = [];
 let questionnaireData = [];
 let chartInstances = {};
+let firebaseConfig; // Definisikan di scope yang lebih luas
 
 Chart.defaults.font.family = "'Inter', sans-serif";
 Chart.defaults.color = 'var(--color-text-secondary)';
@@ -91,15 +92,20 @@ function initializeAppSequence() {
 
 async function initializeFirebase() {
     try {
-        const firebaseConfig = {
-            apiKey: "AIzaSyDXLA7gDQcQtoOrgdW2PnTmYg8q7YQ0OLU",
-            authDomain: "mobilisasi-69979.firebaseapp.com",
-            projectId: "mobilisasi-69979",
-            storageBucket: "mobilisasi-69979.firebasestorage.app",
-            messagingSenderId: "97383306678",
-            appId: "1:97383306678:web:559cfabae7d7ba24631d17",
-            measurementId: "G-HQL9JQBMN3"
-        };
+        // Gunakan variabel global jika ada, jika tidak, gunakan konfigurasi default
+        if (typeof __firebase_config !== 'undefined') {
+            firebaseConfig = JSON.parse(__firebase_config);
+        } else {
+            firebaseConfig = {
+                apiKey: "AIzaSyDXLA7gDQcQtoOrgdW2PnTmYg8q7YQ0OLU",
+                authDomain: "mobilisasi-69979.firebaseapp.com",
+                projectId: "mobilisasi-69979",
+                storageBucket: "mobilisasi-69979.firebasestorage.app",
+                messagingSenderId: "97383306678",
+                appId: "1:97383306678:web:559cfabae7d7ba24631d17",
+                measurementId: "G-HQL9JQBMN3"
+            };
+        }
         
         const app = initializeApp(firebaseConfig);
         db = getFirestore(app);
@@ -788,7 +794,8 @@ Buat rencana intervensi yang sangat detail dan personal berdasarkan SEMUA variab
     Berdasarkan SOP di atas, berikan rencana dalam format JSON.`;
 
     try {
-        const apiKey = ""; // API Key akan disuntikkan oleh environment
+        // PERBAIKAN: Gunakan apiKey dari konfigurasi Firebase
+        const apiKey = firebaseConfig.apiKey;
         const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
 
         const payload = {
@@ -808,6 +815,9 @@ Buat rencana intervensi yang sangat detail dan personal berdasarkan SEMUA variab
         if (!response.ok) {
             const errorBody = await response.json().catch(() => response.text());
             console.error("AI API Error:", response.status, response.statusText, errorBody);
+            if (response.status === 403) {
+                throw new Error(`Akses ditolak (Error 403). Pastikan API Key yang digunakan dalam konfigurasi Firebase sudah benar dan telah mengaktifkan 'Generative Language API' di Google Cloud Console.`);
+            }
             throw new Error(`AI response not OK: ${response.status}. Cek console untuk detail.`);
         }
 
@@ -843,7 +853,7 @@ Buat rencana intervensi yang sangat detail dan personal berdasarkan SEMUA variab
             rasionalTarget: "Gagal memproses data AI.",
             saranDanAksi: [{ 
                 kategori: "Peringatan Sistem", 
-                saran: `Terjadi kesalahan saat mengambil saran AI (${error.message}). <strong>Gunakan penilaian klinis manual.</strong> Cek Developer Console (F12) untuk detail teknis.` 
+                saran: `Terjadi kesalahan saat mengambil saran AI (${error.message}). <strong>Gunakan penilaian klinis manual.</strong>` 
             }]
         };
     }

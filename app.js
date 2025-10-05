@@ -758,11 +758,16 @@ Analisis kondisi yang menjadi kontraindikasi absolut untuk progresi mobilisasi.
 - **GANGGUAN KESADARAN (RASS bukan '0' atau '-1'):** Target **TIDAK BOLEH NAIK**. Fokus pada observasi neurologis dan keselamatan pasien dari risiko jatuh/cedera.
 - **EFEK ANESTESI SPINAL (Jam Post-Op < 12 jam DAN Anestesi Spinal):** Target **MAKSIMAL LEVEL 1**. Progresi ke duduk/berdiri berisiko tinggi hipotensi ortostatik berat.
 
-#### **LANGKAH 2: PENENTUAN TARGET LEVEL MOBILISASI**
-Tentukan target level yang paling TEPAT berdasarkan kondisi pasien.
-1.  Jika ada **SATU atau LEBIH "Red Flag"** dari Langkah 1, **Target Level = Level Saat Ini**.
-2.  Jika **TIDAK ADA "Red Flag"**, maka **Target Level = Level Saat Ini + 1**.
-3.  Tuliskan **rasional Target** yang sangat jelas dan singkat. Contoh: "Pasien stabil tanpa red flags, siap progresi ke latihan berdiri untuk aktivasi otot postural." atau "Nyeri hebat menjadi penghalang utama, fokus pada manajemen nyeri sebelum progresi."
+#### LANGKAH 2: PENENTUAN TARGET LEVEL MOBILISASI (BERBASIS WAKTU & KONDISI)
+Tentukan target level yang paling TEPAT dan AMAN untuk dicapai pasien dalam 12-24 jam ke depan. **ABAIKAN LEVEL MOBILISASI SAAT INI**, dan fokus pada kondisi ideal pasien.
+
+1.  Jika ada **SATU atau LEBIH "Red Flag"** dari Langkah 1, **Target Level = Level Saat Ini**. Rasionalnya adalah "Progresi ditunda karena [sebutkan red flag, misal: nyeri hebat], fokus pada stabilisasi."
+2.  Jika **TIDAK ADA "Red Flag"**, tentukan Target Level berdasarkan panduan waktu berikut:
+    * **Jam Post-Op 0-6 Jam:** Target ideal adalah **Level 1**.
+    * **Jam Post-Op 6-12 Jam:** Target ideal adalah **Level 2**.
+    * **Jam Post-Op 12-24 Jam:** Target ideal adalah **Level 3**.
+    * **Jam Post-Op > 24 Jam:** Target ideal adalah **Level 4 atau lebih tinggi**, sesuaikan dengan jenis operasi dan usia.
+3.  Tuliskan **rasional Target** yang sangat jelas dan singkat. Contoh: "Pasien 14 jam post-op tanpa red flags, target ideal sesuai protokol ERAS adalah berdiri (Level 3) untuk melatih kekuatan postural."
 
 #### **LANGKAH 3: PEMBUATAN SARAN & AKSI YANG SANGAT SPESIFIK (MINIMAL 3)**
 **PENTING: Total gabungan huruf untuk semua \`saran\` dalam \`saranDanAksi\` TIDAK BOLEH MELEBIHI 300 huruf.**

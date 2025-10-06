@@ -1112,20 +1112,32 @@ function renderQuestionnaireAnalysis(data) {
     document.getElementById('score-improvement').textContent = `${improvementPercentage.toFixed(0)}%`;
 
     // Render Chart dengan skala (suggestedMax) yang sudah diperbaiki
-    renderChart('domain-analysis-chart', 'bar', {
-        labels: ['Pengetahuan', 'Fungsi Fisik & Keyakinan', 'Hambatan Nyeri'],
-        datasets: [{
-            label: 'Skor Rata-rata Pre-Test',
-            data: [avgPreScores.pengetahuan, avgPreScores.fungsiFisik, avgPreScores.hambatanNyeri],
-            backgroundColor: 'rgba(var(--color-warning-rgb), 0.6)'
-        }, {
-            label: 'Skor Rata-rata Post-Test',
-            data: [avgPostScores.pengetahuan, avgPostScores.fungsiFisik, avgPostScores.hambatanNyeri],
-            backgroundColor: 'rgba(var(--color-success-rgb), 0.7)'
-        }]
-    }, {
-        scales: { y: { beginAtZero: true, suggestedMax: 6 } } // INI PERBAIKAN PENTING UNTUK VISUALISASI
-    });
+    // --- KODE BARU SEBAGAI PENGGANTI ---
+	renderChart('domain-analysis-chart', 'bar', {
+    // PERUBAHAN 1: Mengganti label "Hambatan Nyeri"
+    	labels: ['Pengetahuan', 'Fungsi Fisik & Keyakinan', 'Persepsi Hambatan Nyeri'],
+    	datasets: [{
+        	label: 'Skor Rata-rata Pre-Test',
+        	data: [avgPreScores.pengetahuan, avgPreScores.fungsiFisik, avgPreScores.hambatanNyeri],
+        // PERUBAHAN 2: Menambahkan warna beragam untuk Pre-Test
+        	backgroundColor: [
+            	'rgba(251, 146, 60, 0.6)', // Oranye untuk Pengetahuan
+            	'rgba(245, 158, 11, 0.6)', // Kuning untuk Fungsi Fisik
+            	'rgba(239, 68, 68, 0.6)'   // Merah untuk Hambatan Nyeri
+        	]
+    	}, {
+        	label: 'Skor Rata-rata Post-Test',
+        	data: [avgPostScores.pengetahuan, avgPostScores.fungsiFisik, avgPostScores.hambatanNyeri],
+        // PERUBAHAN 3: Menambahkan warna beragam untuk Post-Test
+        	backgroundColor: [
+            	'rgba(34, 197, 94, 0.7)',  // Hijau untuk Pengetahuan
+            	'rgba(59, 130, 246, 0.7)', // Biru untuk Fungsi Fisik
+            	'rgba(14, 165, 233, 0.7)'  // Biru Langit untuk Hambatan Nyeri
+        	]
+    	}]
+	}, {
+    scales: { y: { beginAtZero: true, suggestedMax: 6 } }
+	});
 
     // Tulis Interpretasi
     const interpretationContainer = document.getElementById('questionnaire-interpretation');
